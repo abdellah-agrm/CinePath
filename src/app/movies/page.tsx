@@ -127,7 +127,7 @@ export default function MoviesCatalogPage() {
         <span className="text-muted-foreground font-medium mr-2 flex items-center gap-1">
           <Filter className="h-3.5 w-3.5" /> Genre:
         </span>
-        {["ALL", "Action", "Adventure", "Science Fiction", "Drama", "Animation", "Comedy"].map(
+        {["ALL", "Action", "Adventure", "Science Fiction", "Drama", "Animation", "Comedy", "Horror", "Thriller"].map(
           (genre) => (
             <button
               key={genre}

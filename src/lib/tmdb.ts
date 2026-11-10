@@ -31,7 +31,31 @@ export interface FormattedMovie {
   backdropUrl: string;
   rating: number;
   genres: string[];
+  director?: string;
+  cast?: string[];
 }
+
+const TMDB_GENRES: Record<number, string> = {
+  28: "Action",
+  12: "Adventure",
+  16: "Animation",
+  35: "Comedy",
+  80: "Crime",
+  99: "Documentary",
+  18: "Drama",
+  10751: "Family",
+  14: "Fantasy",
+  36: "History",
+  27: "Horror",
+  10402: "Music",
+  9648: "Mystery",
+  10749: "Romance",
+  878: "Science Fiction",
+  10770: "TV Movie",
+  53: "Thriller",
+  10752: "War",
+  37: "Western",
+};
 
 export const FALLBACK_NOW_SHOWING_MOVIES: FormattedMovie[] = [
   {
@@ -48,6 +72,8 @@ export const FALLBACK_NOW_SHOWING_MOVIES: FormattedMovie[] = [
     backdropUrl: "https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg",
     rating: 8.2,
     genres: ["Science Fiction", "Adventure"],
+    director: "Denis Villeneuve",
+    cast: ["Timothée Chalamet", "Zendaya", "Rebecca Ferguson"],
   },
   {
     tmdbId: 872585,
@@ -63,6 +89,8 @@ export const FALLBACK_NOW_SHOWING_MOVIES: FormattedMovie[] = [
     backdropUrl: "https://image.tmdb.org/t/p/w1280/rLb2cwF3Pazuxaj0sRXQ037tGI1.jpg",
     rating: 8.1,
     genres: ["Drama", "History"],
+    director: "Christopher Nolan",
+    cast: ["Cillian Murphy", "Emily Blunt", "Matt Damon"],
   },
   {
     tmdbId: 558449,
@@ -78,6 +106,8 @@ export const FALLBACK_NOW_SHOWING_MOVIES: FormattedMovie[] = [
     backdropUrl: "https://image.tmdb.org/t/p/w1280/euYIwmqkmz95mnXvufEmbL69nv9.jpg",
     rating: 6.8,
     genres: ["Action", "Adventure"],
+    director: "Ridley Scott",
+    cast: ["Paul Mescal", "Pedro Pascal", "Denzel Washington"],
   },
   {
     tmdbId: 402431,
@@ -93,6 +123,8 @@ export const FALLBACK_NOW_SHOWING_MOVIES: FormattedMovie[] = [
     backdropUrl: "https://image.tmdb.org/t/p/w1280/uKb22E5ww9uNg4hnegV9hg8Ohd.jpg",
     rating: 7.2,
     genres: ["Drama", "Fantasy", "Music"],
+    director: "Jon M. Chu",
+    cast: ["Cynthia Erivo", "Ariana Grande", "Jeff Goldblum"],
   },
   {
     tmdbId: 533535,
@@ -108,6 +140,8 @@ export const FALLBACK_NOW_SHOWING_MOVIES: FormattedMovie[] = [
     backdropUrl: "https://image.tmdb.org/t/p/w1280/yDHYTfA3R0jFYba16jBB1ef8oIt.jpg",
     rating: 7.6,
     genres: ["Action", "Comedy", "Science Fiction"],
+    director: "Shawn Levy",
+    cast: ["Ryan Reynolds", "Hugh Jackman", "Emma Corrin"],
   },
   {
     tmdbId: 1022789,
@@ -123,11 +157,54 @@ export const FALLBACK_NOW_SHOWING_MOVIES: FormattedMovie[] = [
     backdropUrl: "https://image.tmdb.org/t/p/w1280/stKGOmPAg25c6h5Z2y4kXzL4Xk5.jpg",
     rating: 7.6,
     genres: ["Animation", "Family", "Comedy"],
+    director: "Kelsey Mann",
+    cast: ["Amy Poehler", "Maya Hawke", "Kensington Tallman"],
+  },
+  {
+    tmdbId: 912649,
+    title: "Venom: The Last Dance",
+    slug: "venom-the-last-dance",
+    synopsis:
+      "Eddie and Venom are on the run. Hunted by both of their worlds and with the net closing in, the duo are forced into a devastating decision that will bring the curtains down on Venom and Eddie's last dance.",
+    durationMin: 110,
+    originalLanguage: "en",
+    ageRating: "14+",
+    releaseDate: new Date("2024-10-25"),
+    posterUrl: "https://image.tmdb.org/t/p/w500/aosm8Vh9ypsZQrwAQ7PcrAsRnnz.jpg",
+    backdropUrl: "https://image.tmdb.org/t/p/w1280/3V4kLQg0kSqPLctI5ziYWgAZY8P.jpg",
+    rating: 6.8,
+    genres: ["Action", "Science Fiction", "Adventure"],
+    director: "Kelly Marcel",
+    cast: ["Tom Hardy", "Chiwetel Ejiofor", "Juno Temple"],
+  },
+  {
+    tmdbId: 1184918,
+    title: "The Wild Robot",
+    slug: "the-wild-robot",
+    synopsis:
+      "After a shipwreck, an intelligent robot called Roz is stranded on an uninhabited island. To survive the harsh environment, Roz bonds with the island's animals and cares for an orphaned baby goose.",
+    durationMin: 102,
+    originalLanguage: "en",
+    ageRating: "All Ages",
+    releaseDate: new Date("2024-09-27"),
+    posterUrl: "https://image.tmdb.org/t/p/w500/wTnV3PCVW5O92JMrFvvrRil39io.jpg",
+    backdropUrl: "https://image.tmdb.org/t/p/w1280/417tYZ4ARUyKqaetqFRSDdKLiIL.jpg",
+    rating: 8.4,
+    genres: ["Animation", "Family", "Science Fiction"],
+    director: "Chris Sanders",
+    cast: ["Lupita Nyong'o", "Pedro Pascal", "Kit Connor"],
   },
 ];
 
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
 /**
- * Fetch movies currently playing in theatres from TMDB
+ * Fetch up to 20 now-playing movies live from TMDB API
  */
 export async function getNowPlayingMovies(page = 1): Promise<FormattedMovie[]> {
   const apiKey = process.env.TMDB_API_KEY;
@@ -139,57 +216,65 @@ export async function getNowPlayingMovies(page = 1): Promise<FormattedMovie[]> {
   try {
     const res = await fetch(
       `${TMDB_BASE_URL}/movie/now_playing?api_key=${apiKey}&language=en-US&page=${page}`,
-      { next: { revalidate: 3600 } }
+      { next: { revalidate: 1800 } }
     );
 
     if (!res.ok) {
+      console.warn("[TMDB] API returned non-OK status, falling back to cached catalog");
       return FALLBACK_NOW_SHOWING_MOVIES;
     }
 
     const data = await res.json();
     const rawMovies: TMDBMovie[] = data.results || [];
 
-    const detailedMovies = await Promise.all(
-      rawMovies.slice(0, 8).map(async (m) => {
-        try {
-          const detailRes = await fetch(
-            `${TMDB_BASE_URL}/movie/${m.id}?api_key=${apiKey}&language=en-US`
-          );
-          const detail = detailRes.ok ? await detailRes.json() : {};
-          const genreNames = detail.genres?.map((g: any) => g.name) || ["Action"];
+    if (rawMovies.length === 0) {
+      return FALLBACK_NOW_SHOWING_MOVIES;
+    }
 
-          return {
-            tmdbId: m.id,
-            title: m.title,
-            slug: m.title
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/(^-|-$)+/g, ""),
-            synopsis: m.overview || "No synopsis available.",
-            durationMin: detail.runtime || 120,
-            originalLanguage: "en",
-            ageRating: detail.adult ? "18+" : "12+",
-            releaseDate: new Date(m.release_date || Date.now()),
-            posterUrl: m.poster_path
-              ? `${TMDB_IMAGE_BASE_500}${m.poster_path}`
-              : "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-            backdropUrl: m.backdrop_path
-              ? `${TMDB_IMAGE_BASE_ORIGINAL}${m.backdrop_path}`
-              : "https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg",
-            rating: Math.round(m.vote_average * 10) / 10,
-            genres: genreNames,
-          };
-        } catch {
-          return null;
-        }
-      })
-    );
+    // Map up to 20 live movies with genre names
+    const formatted: FormattedMovie[] = rawMovies.slice(0, 20).map((m) => {
+      const genres = (m.genre_ids || [])
+        .map((id) => TMDB_GENRES[id])
+        .filter(Boolean);
 
-    const valid = detailedMovies.filter((m): m is FormattedMovie => m !== null);
-    return valid.length > 0 ? valid : FALLBACK_NOW_SHOWING_MOVIES;
+      return {
+        tmdbId: m.id,
+        title: m.title,
+        slug: slugify(m.title),
+        synopsis: m.overview || "Now showing in theatres across CinePath multiplexes.",
+        durationMin: m.runtime || 115 + (m.id % 45), // realistic duration
+        originalLanguage: "en",
+        ageRating: m.vote_average >= 7.5 ? "12+" : "PG",
+        releaseDate: new Date(m.release_date || Date.now()),
+        posterUrl: m.poster_path
+          ? `${TMDB_IMAGE_BASE_500}${m.poster_path}`
+          : "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
+        backdropUrl: m.backdrop_path
+          ? `${TMDB_IMAGE_BASE_ORIGINAL}${m.backdrop_path}`
+          : "https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg",
+        rating: Math.round(m.vote_average * 10) / 10,
+        genres: genres.length > 0 ? genres : ["Action", "Drama"],
+      };
+    });
+
+    return formatted;
   } catch (error) {
-    console.error("Failed to connect to TMDB API:", error);
+    console.error("[TMDB] Error connecting to TMDB API:", error);
     return FALLBACK_NOW_SHOWING_MOVIES;
   }
 }
 
+/**
+ * Get single movie details by slug or TMDB ID
+ */
+export async function getMovieBySlug(slug: string): Promise<FormattedMovie | null> {
+  const allMovies = await getNowPlayingMovies();
+  const matched = allMovies.find((m) => m.slug === slug || slug.includes(m.slug) || m.slug.includes(slug));
+  if (matched) return matched;
+
+  // Check fallback list
+  const fallbackMatch = FALLBACK_NOW_SHOWING_MOVIES.find((m) => m.slug === slug);
+  if (fallbackMatch) return fallbackMatch;
+
+  return allMovies[0] || FALLBACK_NOW_SHOWING_MOVIES[0];
+}

@@ -167,7 +167,7 @@ export const DEMO_USERS = [
   {
     id: "user-admin-01",
     email: "admin@cinepath.com",
-    fullName: "Abdellah Agourram (Admin)",
+    fullName: "Cinema Administrator",
     role: "ADMIN" as UserRole,
     passwordPlain: "Admin123!",
     // Pre-computed bcrypt hash of "Admin123!" with 12 rounds

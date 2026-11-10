@@ -87,12 +87,12 @@ function LoginForm() {
           </p>
         </div>
 
-        {/* 1-Click Quick Demo Login Switcher */}
-        <div className="rounded-2xl border border-primary/20 bg-card/60 p-4 backdrop-blur-sm shadow-xl space-y-3">
+        {/* Quick Role Switcher */}
+        <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur-sm shadow-xl space-y-3">
           <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-            <span className="uppercase tracking-wider">⚡ 1-Click Demo Login</span>
-            <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-              For Review & Testing
+            <span className="uppercase tracking-wider">⚡ Quick Role Switcher</span>
+            <span className="text-[10px] text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border">
+              Select Profile
             </span>
           </div>
 
@@ -139,7 +139,7 @@ function LoginForm() {
                 <User className="h-4 w-4" />
               )}
               <span className="font-semibold">Customer</span>
-              <span className="text-[9px] text-primary/70">User Booking</span>
+              <span className="text-[9px] text-primary/70">User Portal</span>
             </button>
           </div>
         </div>

@@ -138,7 +138,7 @@ async function main() {
     update: { role: "ADMIN", passwordHash: adminHash },
     create: {
       email: "admin@cinepath.com",
-      fullName: "Abdellah Agourram (Admin)",
+      fullName: "Cinema Administrator",
       passwordHash: adminHash,
       role: "ADMIN",
       isVerified: true,

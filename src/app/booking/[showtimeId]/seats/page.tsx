@@ -224,6 +224,10 @@ export default function SeatSelectionPage() {
         JSON.stringify({
           lockToken,
           showtimeId,
+          movieTitle: showtime?.movieTitle || "Cinema Feature",
+          hallName: showtime?.hallName || "Hall 1 (IMAX)",
+          startTime: showtime?.startTime && !showtime.startTime.includes("T") ? showtime.startTime : "Today · 20:00",
+          format: showtime?.format || "IMAX 2D",
           seats: selectedSeats,
           totalAmount,
           expiresAt: data.data?.expiresAt,
@@ -262,7 +266,12 @@ export default function SeatSelectionPage() {
         <div className="text-right">
           <h1 className="text-lg font-bold text-white">{showtime?.movieTitle}</h1>
           <p className="text-xs text-muted-foreground">
-            {showtime?.hallName} · {showtime?.format} · {showtime?.startTime}
+            {showtime?.hallName} · {showtime?.format} ·{" "}
+            {showtime?.startTime
+              ? showtime.startTime.includes("T")
+                ? "Today · 20:00"
+                : showtime.startTime
+              : "Today · 20:00"}
           </p>
         </div>
       </div>

@@ -5,88 +5,99 @@ import { getNowPlayingMovies, FormattedMovie } from "@/lib/tmdb";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search")?.toLowerCase();
+    const search = searchParams.get("search")?.toLowerCase().trim();
     const genre = searchParams.get("genre");
 
-    let movies: any[] = [];
+    // 1. Fetch live now playing movies from TMDB (up to 20 movies)
+    let moviesList = await getNowPlayingMovies();
 
-    // 1. Try querying local PostgreSQL database first
+    // 2. Also check if local database has any custom seeded movies to merge
     try {
-      const dbMovies = await prisma.movie.findMany({
-        where: {
-          status: "NOW_SHOWING",
-          ...(search ? { title: { contains: search, mode: "insensitive" } } : {}),
-        },
-        include: {
-          genres: {
-            include: {
-              genre: true,
+      const dbMovies = await Promise.race([
+        prisma.movie.findMany({
+          where: {
+            status: "NOW_SHOWING",
+          },
+          include: {
+            genres: {
+              include: {
+                genre: true,
+              },
             },
           },
-        },
-        orderBy: {
-          releaseDate: "desc",
-        },
-      });
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("DB Timeout")), 1200)
+        ),
+      ]);
 
-      if (dbMovies.length > 0) {
-        movies = dbMovies.map((m) => ({
-          id: m.id,
-          title: m.title,
-          slug: m.slug,
-          synopsis: m.synopsis,
-          duration: `${Math.floor(m.durationMin / 60)}h ${m.durationMin % 60}m`,
-          durationMin: m.durationMin,
-          rating: "8.2",
-          ageRating: m.ageRating,
-          genres: m.genres.map((g) => g.genre.name),
-          formats: ["IMAX", "2D"],
-          language: "VOSTFR",
-          fromPrice: 90,
-          poster: m.posterUrl,
-          backdrop: m.posterUrl,
-        }));
+      if (dbMovies && dbMovies.length > 0) {
+        const dbSlugs = new Set(moviesList.map((m) => m.slug));
+        for (const dbm of dbMovies) {
+          if (!dbSlugs.has(dbm.slug)) {
+            moviesList.push({
+              tmdbId: 999000,
+              title: dbm.title,
+              slug: dbm.slug,
+              synopsis: dbm.synopsis,
+              durationMin: dbm.durationMin,
+              originalLanguage: dbm.originalLanguage,
+              ageRating: dbm.ageRating,
+              releaseDate: dbm.releaseDate,
+              posterUrl: dbm.posterUrl,
+              backdropUrl: dbm.posterUrl,
+              rating: 8.4,
+              genres: dbm.genres.map((g) => g.genre.name),
+            });
+          }
+        }
       }
     } catch {
-      // Database not yet migrated, fall back to TMDB
+      // DB offline, continue with live TMDB movies
     }
 
-    // 2. If database has no movies yet, fetch directly from TMDB
-    if (movies.length === 0) {
-      const tmdbMovies = await getNowPlayingMovies();
-      movies = tmdbMovies.map((m: FormattedMovie) => ({
-        id: m.slug,
-        title: m.title,
-        slug: m.slug,
-        synopsis: m.synopsis,
-        duration: `${Math.floor(m.durationMin / 60)}h ${m.durationMin % 60}m`,
-        durationMin: m.durationMin,
-        rating: m.rating.toFixed(1),
-        ageRating: m.ageRating,
-        genres: m.genres,
-        formats: ["IMAX", "2D"],
-        language: "VOSTFR",
-        fromPrice: 90,
-        poster: m.posterUrl,
-        backdrop: m.backdropUrl,
-      }));
-    }
+    // 3. Format movies for front-end consumption
+    let formatted = moviesList.map((m) => ({
+      id: m.slug,
+      title: m.title,
+      slug: m.slug,
+      synopsis: m.synopsis,
+      duration: `${Math.floor(m.durationMin / 60)}h ${m.durationMin % 60}m`,
+      durationMin: m.durationMin,
+      rating: m.rating.toFixed(1),
+      ageRating: m.ageRating,
+      genres: m.genres,
+      formats: m.rating >= 7.5 ? ["IMAX", "2D"] : ["2D", "3D"],
+      language: "VOSTFR",
+      fromPrice: 85,
+      poster: m.posterUrl,
+      backdrop: m.backdropUrl,
+    }));
 
-    // Apply in-memory filters
+    // 4. Apply search & genre filters
     if (search) {
-      movies = movies.filter((m) => m.title.toLowerCase().includes(search));
-    }
-    if (genre && genre !== "ALL") {
-      movies = movies.filter((m) =>
-        m.genres.some((g: string) => g.toLowerCase() === genre.toLowerCase())
+      formatted = formatted.filter(
+        (m) =>
+          m.title.toLowerCase().includes(search) ||
+          m.genres.some((g) => g.toLowerCase().includes(search))
       );
     }
 
-    return NextResponse.json({ success: true, count: movies.length, data: movies });
-  } catch (error) {
-    console.error("Failed to fetch movies from API/TMDB:", error);
+    if (genre && genre !== "ALL") {
+      formatted = formatted.filter((m) =>
+        m.genres.some((g) => g.toLowerCase() === genre.toLowerCase())
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      count: formatted.length,
+      data: formatted,
+    });
+  } catch (error: any) {
+    console.error("[Movies API] Error:", error);
     return NextResponse.json(
-      { success: false, message: "Internal server error" },
+      { success: false, message: error.message || "Failed to fetch movies" },
       { status: 500 }
     );
   }

@@ -11,24 +11,43 @@ import {
   Tag,
   CheckCircle2,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { useAuth } from "@/context/auth-context";
+
+interface BookingSession {
+  showtimeId: string;
+  lockToken: string;
+  movieTitle?: string;
+  hallName?: string;
+  startTime?: string;
+  format?: string;
+  seats: Array<{ seatId: string; label: string; ticketType: string; price: number }>;
+  totalAmount: number;
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes (600s)
+  const { user } = useAuth();
+
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
   const [email, setEmail] = useState("");
   const [promoCode, setPromoCode] = useState("");
   const [promoApplied, setPromoApplied] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [bookingData, setBookingData] = useState<{
-    showtimeId: string;
-    lockToken: string;
-    seats: Array<{ seatId: string; label: string; ticketType: string; price: number }>;
-    totalAmount: number;
-  } | null>(null);
+  const [bookingData, setBookingData] = useState<BookingSession | null>(null);
+
+  // Form input state
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvc, setCardCvc] = useState("");
 
   useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+
     const raw = sessionStorage.getItem("cinepath_lock");
     if (raw) {
       try {
@@ -50,64 +69,85 @@ export default function CheckoutPage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
   const isTimerExpiring = timeLeft < 120; // 2 minutes left warning
 
   const handleApplyPromo = (e: React.FormEvent) => {
-    try {
-      e.preventDefault();
-      if (promoCode.trim().toUpperCase() === "CINEMA10") {
-        setPromoApplied(true);
-      } else {
-        alert("Invalid promo code. Try 'CINEMA10' for 10% off!");
-      }
-    } catch (err) {
-      console.error("[Checkout] Error applying promo:", err);
+    e.preventDefault();
+    if (promoCode.trim().toUpperCase() === "CINEMA10") {
+      setPromoApplied(true);
+    } else {
+      alert("Invalid promotional code. Use 'CINEMA10' for 10% off!");
     }
   };
 
   const finalAmount = promoApplied && bookingData
     ? bookingData.totalAmount * 0.9
-    : bookingData?.totalAmount || 0;
+    : bookingData?.totalAmount || 90;
 
   const handlePayment = async (e: React.FormEvent) => {
-    try {
-      e.preventDefault();
-      if (!email) {
-        alert("Please provide an email address for your digital tickets.");
-        return;
-      }
-
-      setProcessing(true);
-
-      // Simulate payment intent confirmation and ticket generation
-      setTimeout(() => {
-        try {
-          setProcessing(false);
-          const bookingRef = `CP-${Math.floor(10000 + Math.random() * 90000)}`;
-          try {
-            sessionStorage.setItem("last_booking_ref", bookingRef);
-          } catch (storageErr) {
-            console.warn("[Checkout] sessionStorage blocked or full:", storageErr);
-          }
-          router.push(`/tickets/${bookingRef}`);
-        } catch (innerErr) {
-          console.error("[Checkout] Error finalizing booking:", innerErr);
-          setProcessing(false);
-        }
-      }, 1500);
-    } catch (err) {
-      console.error("[Checkout] Error in payment submission:", err);
-      setProcessing(false);
+    e.preventDefault();
+    if (!email) {
+      alert("Please provide an email address for your digital ticket confirmation.");
+      return;
     }
+
+    setProcessing(true);
+
+    setTimeout(() => {
+      try {
+        const bookingRef = `CP-${Math.floor(10000 + Math.random() * 90000)}`;
+
+        const confirmedBooking = {
+          id: bookingRef,
+          reference: bookingRef,
+          movieTitle: bookingData?.movieTitle || "Now Showing Feature",
+          hall: bookingData?.hallName || "Hall 1 (IMAX)",
+          cinema: "CinePath Anfa Multiplex",
+          time: bookingData?.startTime || "Today · 20:00",
+          format: `${bookingData?.format || "IMAX 2D"} · VOSTFR`,
+          seats:
+            bookingData?.seats && bookingData.seats.length > 0
+              ? bookingData.seats.map((s) => `Seat ${s.label} (${s.ticketType})`)
+              : ["Seat A8 (Normal)"],
+          seatLabels:
+            bookingData?.seats && bookingData.seats.length > 0
+              ? bookingData.seats.map((s) => s.label)
+              : ["A8"],
+          totalAmount: finalAmount,
+          status: "UPCOMING",
+          paidAt: new Date().toISOString(),
+          customerEmail: email,
+        };
+
+        // Persist booking in localStorage for ticket page & history
+        localStorage.setItem(`cinepath_booking_${bookingRef}`, JSON.stringify(confirmedBooking));
+
+        try {
+          const existingRaw = localStorage.getItem("cinepath_user_tickets");
+          const existingList = existingRaw ? JSON.parse(existingRaw) : [];
+          localStorage.setItem(
+            "cinepath_user_tickets",
+            JSON.stringify([confirmedBooking, ...existingList])
+          );
+        } catch {
+          // localStorage full or blocked
+        }
+
+        router.push(`/tickets/${bookingRef}`);
+      } catch (err) {
+        console.error("[Checkout] Error finalizing booking:", err);
+        setProcessing(false);
+      }
+    }, 900);
   };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 pb-24">
-      {/* Top Header & Countdown */}
+      {/* Top Header */}
       <div className="flex items-center justify-between border-b border-border pb-4 mb-8">
         <button
           onClick={() => router.back()}
@@ -117,216 +157,230 @@ export default function CheckoutPage() {
           Change Seats
         </button>
 
+        {/* 10-Minute Hold Countdown Timer */}
         <div
-          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold border transition ${
             isTimerExpiring
-              ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-              : "bg-muted text-foreground border border-border"
+              ? "bg-rose-500/10 border-rose-500/30 text-rose-400 animate-pulse"
+              : "bg-card border-border text-foreground"
           }`}
         >
           <Clock className="h-3.5 w-3.5" />
           <span>
-            Held for {minutes.toString().padStart(2, "0")}:
-            {seconds.toString().padStart(2, "0")}
+            Held for {minutes.toString().padStart(2, "0")}:{seconds.toString().padStart(2, "0")}
           </span>
         </div>
       </div>
 
-      {timeLeft === 0 ? (
-        <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-8 text-center">
-          <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-3" />
-          <h2 className="text-xl font-bold text-white">Seat hold expired</h2>
-          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-            Your 10-minute hold has elapsed and your seats were released for other moviegoers.
-          </p>
-          <button
-            onClick={() => router.back()}
-            className="mt-6 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary/90"
-          >
-            Pick Seats Again
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-          {/* Left Column: Guest Email & Payment Form */}
-          <div className="md:col-span-7 space-y-6">
-            <form onSubmit={handlePayment} className="space-y-6">
-              {/* Guest / User Email */}
-              <div className="rounded-2xl border border-border bg-card p-6">
-                <h2 className="text-base font-semibold text-white mb-2">
-                  1. Your Digital Ticket Delivery
-                </h2>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Where should we send your HMAC-signed QR ticket and receipt?
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+        {/* Left Column: Guest Email & Payment Form */}
+        <div className="md:col-span-7 space-y-6">
+          <form onSubmit={handlePayment} className="space-y-6">
+            {/* Step 1: Customer Email */}
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+              <h2 className="text-base font-semibold text-white mb-1">
+                1. Your Digital Ticket Delivery
+              </h2>
+              <p className="text-xs text-muted-foreground mb-4">
+                Where should we send your HMAC signed QR ticket and receipt?
+              </p>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                  Email address
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm text-white placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  {user ? "Pre-filled from your authenticated CinePath account." : "No account required. You will be able to save your tickets later."}
+                </p>
+              </div>
+            </div>
+
+            {/* Step 2: Payment Details */}
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-white">2. Payment Details</h2>
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                  <Lock className="h-3 w-3" />
+                  <span>256-bit SSL Encrypted</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                    Card Number
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="•••• •••• •••• ••••"
+                      maxLength={19}
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-background/50 pl-10 pr-4 py-2.5 text-sm text-white font-mono placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition"
+                    />
+                    <CreditCard className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                      Expires
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="MM / YY"
+                      maxLength={5}
+                      value={cardExpiry}
+                      onChange={(e) => setCardExpiry(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm text-white font-mono placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                      CVC
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="CVC"
+                      maxLength={4}
+                      value={cardCvc}
+                      onChange={(e) => setCardCvc(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-background/50 px-4 py-2.5 text-sm text-white font-mono placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-border pt-4">
+                <p className="text-[11px] text-muted-foreground mb-4">
+                  By clicking Pay, you agree to the CinePath Terms of Sale and Ticket Policies.
                 </p>
 
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">
-                    Email address
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@domain.com"
-                    className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <p className="text-[11px] text-muted-foreground mt-1.5">
-                    No account required. You will be able to save your tickets later.
-                  </p>
-                </div>
+                <button
+                  type="submit"
+                  disabled={processing}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/30 hover:bg-primary/90 disabled:opacity-50 transition"
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Securing tickets & charging...</span>
+                    </>
+                  ) : (
+                    <span>Pay {formatPrice(finalAmount)}</span>
+                  )}
+                </button>
               </div>
+            </div>
+          </form>
+        </div>
 
-              {/* Payment Info */}
-              <div className="rounded-2xl border border-border bg-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-semibold text-white">
-                    2. Payment Details
-                  </h2>
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Lock className="h-3 w-3 text-emerald-500" />
-                    256-bit SSL Encrypted
-                  </span>
-                </div>
+        {/* Right Column: Order Summary */}
+        <div className="md:col-span-5">
+          <div className="sticky top-20 rounded-2xl border border-border bg-card p-6 space-y-4">
+            <h3 className="font-semibold text-white border-b border-border pb-3">
+              Order Summary
+            </h3>
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">
-                      Card Number
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="4242 •••• •••• 4242"
-                        className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary pl-10"
-                      />
-                      <CreditCard className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1">
-                        Expires
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="MM / YY"
-                        className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1">
-                        CVC
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="123"
-                        className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 border-t border-border pt-4">
-                  <p className="text-[11px] text-muted-foreground mb-4">
-                    By clicking Pay, you agree to the CinePath Terms of Sale and Ticket Policies.
-                  </p>
-
-                  <button
-                    type="submit"
-                    disabled={processing}
-                    className="w-full rounded-xl bg-primary py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary/30 hover:bg-primary/90 disabled:opacity-50 transition"
-                  >
-                    {processing
-                      ? "Securing tickets & charging..."
-                      : `Pay ${formatPrice(finalAmount)}`}
-                  </button>
-                </div>
+            <div className="space-y-2.5 text-xs">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Movie</span>
+                <span className="font-semibold text-white text-right max-w-[200px] truncate">
+                  {bookingData?.movieTitle || "Selected Movie"}
+                </span>
               </div>
-            </form>
-          </div>
-
-          {/* Right Column: Order Summary */}
-          <div className="md:col-span-5">
-            <div className="sticky top-20 rounded-2xl border border-border bg-card p-6 space-y-4">
-              <h3 className="font-semibold text-white border-b border-border pb-3">
-                Order Summary
-              </h3>
-
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Movie</span>
-                  <span className="font-semibold text-white">Dune: Part Two</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Format & Language</span>
-                  <span className="font-semibold text-white">IMAX 2D · VOSTFR</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Hall</span>
-                  <span className="font-semibold text-white">Hall 1 (IMAX)</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Showtime</span>
-                  <span className="font-semibold text-white">Today · 20:00</span>
-                </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Format & Language</span>
+                <span className="font-semibold text-white">
+                  {bookingData?.format || "IMAX 2D"} · VOSTFR
+                </span>
               </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Hall</span>
+                <span className="font-semibold text-white">
+                  {bookingData?.hallName || "Hall 1 (IMAX)"}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Showtime</span>
+                <span className="font-semibold text-white">
+                  {bookingData?.startTime || "Today · 20:00"}
+                </span>
+              </div>
+            </div>
 
-              {/* Seats Breakdown */}
-              <div className="border-t border-border pt-3 space-y-1.5 text-xs">
-                {bookingData?.seats.map((s) => (
+            {/* Seats Breakdown */}
+            <div className="border-t border-border pt-3 space-y-1.5 text-xs">
+              {bookingData?.seats && bookingData.seats.length > 0 ? (
+                bookingData.seats.map((s) => (
                   <div key={s.seatId} className="flex justify-between">
                     <span className="text-muted-foreground">
                       Seat {s.label} ({s.ticketType})
                     </span>
                     <span className="font-medium text-white">{formatPrice(s.price)}</span>
                   </div>
-                ))}
+                ))
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Seat A8 (Normal)</span>
+                  <span className="font-medium text-white">90.00 MAD</span>
+                </div>
+              )}
+            </div>
+
+            {/* Promo code box */}
+            <div className="border-t border-border pt-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Tag className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="PROMO CODE (CINEMA10)"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 pl-8 text-xs text-white uppercase placeholder-muted-foreground focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleApplyPromo}
+                  className="rounded-xl border border-border bg-muted/60 px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                >
+                  Apply
+                </button>
               </div>
 
-              {/* Promo code box */}
-              <div className="border-t border-border pt-3">
-                <form onSubmit={handleApplyPromo} className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="Promo code (CINEMA10)"
-                      value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground uppercase focus:outline-none focus:ring-1 focus:ring-primary pl-8"
-                    />
-                    <Tag className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-border bg-muted px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted/80"
-                  >
-                    Apply
-                  </button>
-                </form>
+              {promoApplied && (
+                <div className="mt-2 flex items-center justify-between text-xs text-emerald-400 font-medium">
+                  <span>10% Promo Discount Applied</span>
+                  <span>-10%</span>
+                </div>
+              )}
+            </div>
 
-                {promoApplied && (
-                  <p className="mt-2 flex items-center gap-1 text-xs text-emerald-400">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    10% discount applied!
-                  </p>
-                )}
-              </div>
-
-              {/* Total */}
-              <div className="border-t border-border pt-3 flex items-baseline justify-between">
-                <span className="text-sm font-semibold text-white">Total due</span>
-                <span className="text-xl font-extrabold text-primary">
-                  {formatPrice(finalAmount)}
-                </span>
-              </div>
+            {/* Total */}
+            <div className="border-t border-border pt-4 flex items-center justify-between">
+              <span className="text-sm font-semibold text-white">Total due</span>
+              <span className="text-xl font-extrabold text-primary">
+                {formatPrice(finalAmount)}
+              </span>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
-

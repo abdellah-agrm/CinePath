@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getNowPlayingMovies, FormattedMovie } from "@/lib/tmdb";
+import { getMovieBySlug, FormattedMovie } from "@/lib/tmdb";
 
 export async function GET(
   _request: Request,
@@ -11,16 +11,21 @@ export async function GET(
 
     // 1. Check in database first
     try {
-      const dbMovie = await prisma.movie.findUnique({
-        where: { slug },
-        include: {
-          genres: { include: { genre: true } },
-          showtimes: {
-            include: { hall: true },
-            orderBy: { startTime: "asc" },
+      const dbMovie = await Promise.race([
+        prisma.movie.findUnique({
+          where: { slug },
+          include: {
+            genres: { include: { genre: true } },
+            showtimes: {
+              include: { hall: true },
+              orderBy: { startTime: "asc" },
+            },
           },
-        },
-      });
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("DB Timeout")), 1200)
+        ),
+      ]);
 
       if (dbMovie) {
         return NextResponse.json({
@@ -38,8 +43,8 @@ export async function GET(
               year: "numeric",
             }),
             synopsis: dbMovie.synopsis,
-            director: "Denis Villeneuve",
-            cast: ["Timothée Chalamet", "Zendaya", "Rebecca Ferguson"],
+            director: "Director",
+            cast: ["Lead Actor", "Supporting Cast"],
             backdrop: dbMovie.posterUrl,
             poster: dbMovie.posterUrl,
             showtimes: dbMovie.showtimes.map((s) => ({
@@ -58,12 +63,18 @@ export async function GET(
         });
       }
     } catch {
-      // Fallback to TMDB
+      // Continue to live TMDB lookup
     }
 
-    // 2. Fallback to TMDB data
-    const tmdbMovies = await getNowPlayingMovies();
-    const movie = tmdbMovies.find((m: FormattedMovie) => m.slug === slug) || tmdbMovies[0];
+    // 2. Fetch from TMDB data
+    const movie = await getMovieBySlug(slug);
+
+    if (!movie) {
+      return NextResponse.json(
+        { success: false, message: "Movie not found" },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -80,15 +91,15 @@ export async function GET(
           year: "numeric",
         }),
         synopsis: movie.synopsis,
-        director: "Official TMDB Director",
-        cast: ["Lead Actor", "Supporting Actor", "Cast Member"],
+        director: movie.director || "Official Studio Release",
+        cast: movie.cast || ["Lead Actor", "Supporting Cast", "Featured Performer"],
         backdrop: movie.backdropUrl,
         poster: movie.posterUrl,
         showtimes: [
           {
             id: `showtime-${movie.slug}-1`,
             time: "14:30",
-            hall: "Hall 2",
+            hall: "Hall 2 (Standard)",
             format: "2D",
             language: "VF",
             fromPrice: 80,
@@ -98,7 +109,7 @@ export async function GET(
             id: `showtime-${movie.slug}-2`,
             time: "17:30",
             hall: "Hall 1 (IMAX)",
-            format: "IMAX",
+            format: "IMAX 2D",
             language: "VOSTFR",
             fromPrice: 110,
             badge: "Few seats left",
@@ -107,7 +118,7 @@ export async function GET(
             id: `showtime-${movie.slug}-3`,
             time: "20:00",
             hall: "Hall 1 (IMAX)",
-            format: "IMAX",
+            format: "IMAX 2D",
             language: "VOSTFR",
             fromPrice: 120,
             badge: "Selling fast",
@@ -115,10 +126,10 @@ export async function GET(
         ],
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to fetch movie details:", error);
     return NextResponse.json(
-      { success: false, message: "Movie not found" },
+      { success: false, message: error.message || "Movie not found" },
       { status: 404 }
     );
   }
