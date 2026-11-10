@@ -105,33 +105,30 @@ export default function AdminDashboardPage() {
       <div className="mt-6 flex border-b border-border text-xs font-semibold">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 transition ${
-            activeTab === "overview"
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 transition ${activeTab === "overview"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-white"
-          }`}
+            }`}
         >
           <BarChart3 className="h-4 w-4" />
           Overview & Metrics
         </button>
         <button
           onClick={() => setActiveTab("halls")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 transition ${
-            activeTab === "halls"
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 transition ${activeTab === "halls"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-white"
-          }`}
+            }`}
         >
           <Grid className="h-4 w-4" />
           Hall Grid Layout Editor
         </button>
         <button
           onClick={() => setActiveTab("showtimes")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 transition ${
-            activeTab === "showtimes"
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 transition ${activeTab === "showtimes"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-white"
-          }`}
+            }`}
         >
           <Calendar className="h-4 w-4" />
           Showtimes & Pricing
@@ -306,11 +303,10 @@ export default function AdminDashboardPage() {
                 <button
                   key={tool.type}
                   onClick={() => setPaintBrush(tool.type)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition ${
-                    paintBrush === tool.type
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition ${paintBrush === tool.type
                       ? "ring-2 ring-primary text-white shadow-md"
                       : "opacity-70 hover:opacity-100 text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   <span className={`h-3 w-3 rounded-full ${tool.color}`} />
                   {tool.label}
@@ -360,14 +356,14 @@ export default function AdminDashboardPage() {
                             title={`Click to paint as ${paintBrush}`}
                           >
                             {cellType === "AISLE"
-                              ? "—"
+                              ? "-"
                               : cellType === "VIP"
-                              ? "V"
-                              : cellType === "WHEELCHAIR"
-                              ? "♿"
-                              : cellType === "BROKEN"
-                              ? "✕"
-                              : cIdx + 1}
+                                ? "V"
+                                : cellType === "WHEELCHAIR"
+                                  ? "♿"
+                                  : cellType === "BROKEN"
+                                    ? "✕"
+                                    : cIdx + 1}
                           </div>
                         );
                       })}

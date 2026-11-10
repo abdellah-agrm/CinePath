@@ -9,7 +9,7 @@ export default function NotFoundPage() {
       </div>
 
       <span className="text-xs font-mono font-bold text-primary uppercase tracking-widest">
-        404 — Screen Blank
+        404 - Screen Blank
       </span>
 
       <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mt-2">

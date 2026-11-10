@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "CinePath — Cinema Booking Platform",
+    name: "CinePath - Cinema Booking Platform",
     short_name: "CinePath",
     description: "Real-time seat selection, cinema showtimes, and digital HMAC QR passes",
     start_url: "/",

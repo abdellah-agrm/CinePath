@@ -1,4 +1,4 @@
-# 🎬 CinePath — Cinema Booking Web Platform
+# 🎬 CinePath - Cinema Booking Web Platform
 
 A modern, high-performance cinema booking platform with real-time seat locking, atomic transactions, digital QR tickets, and guest checkout.
 

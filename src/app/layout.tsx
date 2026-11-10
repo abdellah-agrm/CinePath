@@ -5,7 +5,7 @@ import { Film, Ticket, MapPin, User as UserIcon } from "lucide-react";
 import { PWARegister } from "@/components/pwa-register";
 
 export const metadata: Metadata = {
-  title: "CinePath — Cinema Booking Platform",
+  title: "CinePath - Cinema Booking Platform",
   description: "Browse movies, check showtimes, select seats in real-time, and book tickets.",
   appleWebApp: {
     capable: true,

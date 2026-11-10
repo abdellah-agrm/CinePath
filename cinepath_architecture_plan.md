@@ -1,4 +1,4 @@
-# 🎬 CinePath — Cinema Booking Web Platform
+# 🎬 CinePath - Cinema Booking Web Platform
 
 > A modern cinema web application for browsing movies, checking showtimes, selecting seats in real time, and booking tickets online.
 > **Version 1 scope: Web only.** Mobile (Play Store) is planned for a later phase.
@@ -51,7 +51,7 @@
 - Provide a clean admin back-office with visual seat-grid configuration.
 - Build an architecture that can later power a mobile app (API-first).
 
-### 2.2 In Scope (Version 1 — Web)
+### 2.2 In Scope (Version 1 - Web)
 - Public catalog: movies, cinemas, showtimes (with audio/subtitle language & projection format)
 - Authentication & user profiles
 - Interactive seat selection (supporting aisles, VIP tiers, wheelchair spaces) with atomic temporary seat locking
@@ -402,7 +402,7 @@ classDiagram
     User --> Role
 ```
 
-### 7.3 Sequence Diagram — Booking Flow (With Atomic Locks & Late-Webhook Auto-Refund)
+### 7.3 Sequence Diagram - Booking Flow (With Atomic Locks & Late-Webhook Auto-Refund)
 
 ```mermaid
 sequenceDiagram
@@ -453,7 +453,7 @@ sequenceDiagram
     end
 ```
 
-### 7.4 State Diagram — Booking Lifecycle
+### 7.4 State Diagram - Booking Lifecycle
 
 ```mermaid
 stateDiagram-v2
@@ -469,7 +469,7 @@ stateDiagram-v2
     REFUNDED --> [*]
 ```
 
-### 7.5 Activity Diagram — Ticket Validation (Staff)
+### 7.5 Activity Diagram - Ticket Validation (Staff)
 
 ```mermaid
 flowchart TD
@@ -679,17 +679,17 @@ Base URL: `/api/v1`
 
 | Module | Method | Endpoint | Auth | Description |
 |---|---|---|---|---|
-| Auth | POST | `/auth/register` | — | Create account |
-| Auth | POST | `/auth/login` | — | Login, returns tokens |
+| Auth | POST | `/auth/register` | - | Create account |
+| Auth | POST | `/auth/login` | - | Login, returns tokens |
 | Auth | POST | `/auth/refresh` | Cookie | Refresh access token |
 | Auth | POST | `/auth/logout` | User | Invalidate session |
-| Auth | POST | `/auth/forgot-password` | — | Send reset email |
+| Auth | POST | `/auth/forgot-password` | - | Send reset email |
 | Users | GET/PATCH | `/users/me` | User | Profile |
-| Movies | GET | `/movies` | — | List + filters + pagination |
-| Movies | GET | `/movies/:id` | — | Movie details |
-| Cinemas | GET | `/cinemas` | — | List cinemas |
-| Showtimes | GET | `/showtimes?movieId=&cinemaId=&date=` | — | Search showtimes |
-| Showtimes | GET | `/showtimes/:id/seats` | — | Grid seat map + live status + price modifiers |
+| Movies | GET | `/movies` | - | List + filters + pagination |
+| Movies | GET | `/movies/:id` | - | Movie details |
+| Cinemas | GET | `/cinemas` | - | List cinemas |
+| Showtimes | GET | `/showtimes?movieId=&cinemaId=&date=` | - | Search showtimes |
+| Showtimes | GET | `/showtimes/:id/seats` | - | Grid seat map + live status + price modifiers |
 | Booking | POST | `/showtimes/:id/lock-seats` | User | Atomically lock selected seats |
 | Booking | POST | `/bookings` | User | Create booking (requires `lockToken`) |
 | Booking | GET | `/bookings/me` | User | My bookings |
@@ -733,31 +733,31 @@ Base URL: `/api/v1`
 | # | Principle | What it means in practice |
 |---|---|---|
 | 1 | **Fewest steps possible** | Combine screens that don't need to be separate (seat + ticket type, checkout + payment). |
-| 2 | **Smart defaults** | Today's date, nearest cinema, "Normal" ticket type, 2 seats — all pre-selected. User only changes what's wrong. |
+| 2 | **Smart defaults** | Today's date, nearest cinema, "Normal" ticket type, 2 seats - all pre-selected. User only changes what's wrong. |
 | 3 | **Never lose progress** | Back button always works; selected showtime/seats survive refresh; going back keeps state. |
 | 4 | **Always show where I am & what it costs** | Sticky context header (movie · time · hall) and a live total on every booking screen. |
 | 5 | **Delay friction** | No login wall, no account creation, no long forms before payment. Ask for the email only at checkout. |
 | 6 | **Make time visible** | The 10-minute seat hold is shown as a countdown, never a surprise. |
-| 7 | **Errors are recoverable** | If a seat is taken, offer alternatives next to it — don't send the user back to the start. |
+| 7 | **Errors are recoverable** | If a seat is taken, offer alternatives next to it - don't send the user back to the start. |
 | 8 | **Skeletons, not spinners** | Show the page shape while loading (no full-screen mascot/loader for every step). |
 | 9 | **Mobile-first, thumb-friendly** | Primary action always at the bottom; touch targets ≥ 44 px. |
 | 10 | **Inclusive by default** | WCAG 2.1 AA, keyboard-usable seat map, RTL-ready (Arabic), French/English. |
 
 ### 11.2 Benchmark: Analysis of a Reference Cinema App
 
-A real cinema app's mobile booking flow (Pathé, 17 screenshots) was analysed screen by screen. It is a good product, but it shows several places where the flow can be simpler. **Only the patterns are reused — not the branding, layout, or assets.**
+A real cinema app's mobile booking flow (Pathé, 17 screenshots) was analysed screen by screen. It is a good product, but it shows several places where the flow can be simpler. **Only the patterns are reused - not the branding, layout, or assets.**
 
 | # | Reference screen | ✅ What works (keep) | ⚠️ Friction observed | ✨ CinePath improvement |
 |---|---|---|---|---|
 | 1 | Loading / home | Skeleton screen while loading; big hero with one clear **Book now** button | Hero is a single movie; browsing starts lower on the page | Keep skeleton + hero. Add a quick **"Today in [cinema]"** strip right under the hero. |
 | 2 | Home sections (Now showing, Previews, Coming soon) | Horizontal carousels, clear section titles with `>` to see all | Posters are large; only ~2 visible, so scanning is slow | Show 2.5 posters (peek of the next) to signal scrolling; add genre/language filter chips. |
-| 3 | Now showing — grid / list toggle | Grid ⇄ list toggle; "New" badges; "Show all" filter | Filter is one dropdown; no language or format filter at this level | Sticky filter chips: *Today · Genre · VF/VOSTFR · 2D/3D/IMAX*. Remember the user's last view (grid/list). |
+| 3 | Now showing - grid / list toggle | Grid ⇄ list toggle; "New" badges; "Show all" filter | Filter is one dropdown; no language or format filter at this level | Sticky filter chips: *Today · Genre · VF/VOSTFR · 2D/3D/IMAX*. Remember the user's last view (grid/list). |
 | 4 | Movie detail | Rating, duration, genres, age limit, cast, **My list** & **Rate** actions | Age restriction text is squeezed beside the genres; date chips are cut off ("Thu 12 N…"); cinema selector labelled "At ?" is unclear | Age rating as a badge; horizontally scrollable date strip with full labels; cinema selector labelled **"Cinema"** with a "Nearest" default. |
 | 5 | Showtime tiles | Time, language (VOSTFR), format (4DX), end time shown | No price, no hint if the session is nearly full | Add **"from 90 MAD"** and a **"Few seats left"** badge (e.g. < 15 % free). |
 | 6 | Showtime bottom sheet | Recaps movie, date, time, language, hall, running time, capacity | An extra tap and a full-screen loader before the seats even appear | **Skip the sheet.** Tapping a time goes straight to seats; the recap becomes the sticky header. |
 | 7 | Seat selection | Clear legend (mine / free / occupied); "101 free seats"; pinch-to-zoom hint | Seats are tiny; zoom needed to tap accurately; a lot of vertical space is taken by hint icons; no best-seat suggestion | Larger tap targets with auto-fit, **"Best available"** quick pick, price shown per seat type, hint shown once then hidden. |
 | 8 | Seat summary bar | Shows chosen seat ("C9") with a clear button | Seat chosen first, ticket type chosen on the *next* screen | Choose the ticket type **on the same screen**, per seat, defaulting to "Normal". |
-| 9 | Select your rates | Clear prices; +/− steppers; running total; disabled button explains why ("1 rate to be selected to continue") | Starts at 0 for every rate even though only one seat was chosen — the user must re-do work; voucher box takes the most space but few users have vouchers | Pre-fill rates from the seat count; collapse **"Have a promo/voucher code?"** into a small link. |
+| 9 | Select your rates | Clear prices; +/− steppers; running total; disabled button explains why ("1 rate to be selected to continue") | Starts at 0 for every rate even though only one seat was chosen - the user must re-do work; voucher box takes the most space but few users have vouchers | Pre-fill rates from the seat count; collapse **"Have a promo/voucher code?"** into a small link. |
 | 10 | Login / consent | Shows which account is used and where the e-ticket goes | Terms checkbox blocks the button; separate "My consents" section; a second terms checkbox appears again on the payment page | **One** consent line at the pay button; no repeated checkboxes; guest checkout supported. |
 | 11 | Payment page | Shows order number, merchant, amount | Redirects to a third-party page in another language (French) with a different visual style; long form; second terms checkbox | Embedded payment form inside the same page/theme; same language as the rest of the site; amount repeated on the pay button. |
 
@@ -800,7 +800,7 @@ journey
 
 > Wireframes are low-fidelity (mobile layout). On desktop, the same components are re-arranged into two columns (see 11.6). Final high-fidelity designs go in Figma (Phase 0).
 
-#### Screen 1 — Home / Movie list `/`
+#### Screen 1 - Home / Movie list `/`
 
 ```
 ┌────────────────────────────────┐
@@ -830,7 +830,7 @@ journey
 - Grid/list toggle on `/movies`; the choice is remembered.
 - Search opens as a full-width overlay with instant results (title, genre).
 
-#### Screen 2 — Movie page + showtimes `/movies/[slug]`
+#### Screen 2 - Movie page + showtimes `/movies/[slug]`
 
 ```
 ┌────────────────────────────────┐
@@ -857,12 +857,12 @@ journey
 └────────────────────────────────┘
 ```
 
-- Showtimes come **before** cast/reviews — the primary action is on the first screen.
+- Showtimes come **before** cast/reviews - the primary action is on the first screen.
 - Each showtime tile shows time, language, format, **starting price**, and an availability badge.
 - Past showtimes are greyed out and not tappable. Sold-out showtimes show "Sold out" with a "Notify me" option (future).
 - **Tapping a showtime goes directly to the seat screen** (no intermediate sheet).
 
-#### Screen 3 — Seats + ticket types `/booking/[showtimeId]/seats`  ⭐ *key screen*
+#### Screen 3 - Seats + ticket types `/booking/[showtimeId]/seats`  ⭐ *key screen*
 
 ```
 ┌────────────────────────────────┐
@@ -900,7 +900,7 @@ journey
 - **When does the lock start?** Recommended: lock seats when the user taps **Continue** (not on each tap), so users browsing the map don't block others. The 10-minute timer starts at that moment. If any seat was taken in between, show a friendly message and keep the rest of the selection (see 11.7).
 - Max 8 seats per booking (configurable) with a clear message when reached.
 
-#### Screen 4 — Checkout `/booking/[bookingId]/checkout`
+#### Screen 4 - Checkout `/booking/[bookingId]/checkout`
 
 ```
 ┌────────────────────────────────┐
@@ -927,14 +927,14 @@ journey
 └────────────────────────────────┘
 ```
 
-- **Single page** for summary + email + payment. Payment form is **embedded** (e.g., Stripe Payment Element) — no redirect to an unbranded page.
+- **Single page** for summary + email + payment. Payment form is **embedded** (e.g., Stripe Payment Element) - no redirect to an unbranded page.
 - Logged-in users: email prefilled, no extra step. Guests: only an email is needed.
 - **One** consent line next to the Pay button (use a checkbox only if the law in your market requires explicit opt-in).
 - The Pay button shows the exact amount and a loading state ("Processing…") that prevents double clicks.
 - Promo code is collapsed by default; success shows the discount line in the summary.
 - Edit links ("Change seats") return to Screen 3 **without losing the lock** while the timer is still valid.
 
-#### Screen 5 — Confirmation / Ticket `/tickets/[bookingId]`
+#### Screen 5 - Confirmation / Ticket `/tickets/[bookingId]`
 
 ```
 ┌────────────────────────────────┐
@@ -957,7 +957,7 @@ journey
 
 - QR is shown **immediately** (no waiting for the email) and works offline once opened (cached page).
 - Brightness-boost on the QR view for easy scanning at the entrance.
-- Guests get an optional **"Create account"** prompt *after* purchase (one tap, email already known) — never before.
+- Guests get an optional **"Create account"** prompt *after* purchase (one tap, email already known) - never before.
 - "Cancel booking" is available from `/tickets` according to the cancellation rule (see 11.7).
 
 #### Supporting screens
@@ -1001,15 +1001,15 @@ journey
 
 | Situation | What the user sees | What happens |
 |---|---|---|
-| Seat taken by someone else before **Continue** | Toast: *"Seat C9 was just taken. We kept your other seats — pick another or tap **Suggest a seat**."* | Map refreshes; the rest of the selection is preserved. |
+| Seat taken by someone else before **Continue** | Toast: *"Seat C9 was just taken. We kept your other seats - pick another or tap **Suggest a seat**."* | Map refreshes; the rest of the selection is preserved. |
 | Timer reaches 02:00 | Soft banner: *"2 minutes left to complete your payment."* | Timer turns amber. |
 | Timer expires | Modal: *"Your seats were released. Pick them again?"* with **Same showtime** button | Returns to Screen 3 with the same showtime; no data lost. |
 | Payment declined | Inline error under the card form: *"Your card was declined. Try another card."* | Lock stays valid while timer runs; user can retry. |
 | Payment succeeded **after** the lock expired (late webhook) | Page: *"Payment received but the seats are no longer available. You'll be refunded automatically in X days."* | Backend auto-refund (see §7.3); email confirmation of the refund. |
-| Connection lost during seat selection | Banner: *"You're offline — reconnecting…"*; Continue is disabled | WebSocket auto-reconnect, map re-synced. |
+| Connection lost during seat selection | Banner: *"You're offline - reconnecting…"*; Continue is disabled | WebSocket auto-reconnect, map re-synced. |
 | Showtime sold out | Disabled tile "Sold out" | Optional waitlist (future work). |
 | Cancellation | Confirm dialog showing refund amount and deadline | Seats released and re-sellable (see §8.2). |
-| Empty states | "No showtimes today — try tomorrow" with the next available day shown as a button | Never a dead-end. |
+| Empty states | "No showtimes today - try tomorrow" with the next available day shown as a button | Never a dead-end. |
 
 ### 11.8 Admin Back-Office UX (Short)
 
@@ -1024,7 +1024,7 @@ journey
 |---|---|
 | **Theme** | Dark theme by default (cinema feel; posters pop), with a light theme option. |
 | **Brand colour** | Choose **your own** accent colour (avoid the reference app's yellow/black pairing to keep your identity distinct). |
-| **Semantic colours** | Success green, warning amber, error red, info blue — always paired with an icon/label. |
+| **Semantic colours** | Success green, warning amber, error red, info blue - always paired with an icon/label. |
 | **Typography** | One sans-serif family (e.g., Inter / Poppins; add an Arabic-capable family such as Cairo or Noto Sans Arabic). Scale: 12 / 14 / 16 / 20 / 28 / 36. |
 | **Spacing & radius** | 4-px grid; radius 12 px for cards, 999 px for chips. |
 | **Core components** (shadcn/ui) | `Button`, `Badge`, `Card`, `Tabs`, `Sheet` (bottom sheet), `Dialog`, `Toast`, `Skeleton`, `Select`, `Calendar`, `Form`. |
@@ -1105,7 +1105,7 @@ cinepath/
 
 > Estimated for a solo developer working part-time. Adjust to your pace.
 
-### 🟦 Phase 0 — Conception & Setup (1 week)
+### 🟦 Phase 0 - Conception & Setup (1 week)
 - [ ] Finalize requirements & scope (this document)
 - [ ] UML, ERD, wireframes (Figma)
 - [ ] UX: clickable Figma prototype of the 5-screen booking flow (§11); test it with 3–5 people before coding
@@ -1115,7 +1115,7 @@ cinepath/
 
 **Deliverable:** repo skeleton + design docs
 
-### 🟩 Phase 1 — Foundation & Auth (1–2 weeks)
+### 🟩 Phase 1 - Foundation & Auth (1–2 weeks)
 - [ ] Database schema + Prisma migrations + partial unique indexes + seed data
 - [ ] User registration/login, JWT + refresh, email verification
 - [ ] RBAC middleware
@@ -1124,7 +1124,7 @@ cinepath/
 
 **Deliverable:** working authentication
 
-### 🟨 Phase 2 — Catalog (2 weeks)
+### 🟨 Phase 2 - Catalog (2 weeks)
 - [ ] Movies, genres, cinemas, halls CRUD with grid layout editor (admin)
 - [ ] Public movie list (search, filters, pagination)
 - [ ] Movie details page (trailer, cast, rating)
@@ -1134,7 +1134,7 @@ cinepath/
 
 **Deliverable:** browsable cinema catalog
 
-### 🟧 Phase 3 — Booking Engine (2–3 weeks) ⭐ *core*
+### 🟧 Phase 3 - Booking Engine (2–3 weeks) ⭐ *core*
 - [ ] Interactive grid seat picker (supporting aisles, VIP surcharges, wheelchair spots)
 - [ ] Atomic Redis Lua multi-seat locking with 10m UI / 12m backend TTL
 - [ ] Real-time seat updates (WebSocket)
@@ -1144,7 +1144,7 @@ cinepath/
 
 **Deliverable:** reliable seat reservation
 
-### 🟥 Phase 4 — Payments & Tickets (2 weeks)
+### 🟥 Phase 4 - Payments & Tickets (2 weeks)
 - [ ] Stripe integration (test mode) + webhooks + late-webhook auto-refund handler
 - [ ] HMAC-signed QR-code ticket generation, PDF export
 - [ ] Confirmation & refund emails
@@ -1154,7 +1154,7 @@ cinepath/
 
 **Deliverable:** end-to-end purchase flow
 
-### 🟪 Phase 5 — Admin Dashboard & Staff Tools (2 weeks)
+### 🟪 Phase 5 - Admin Dashboard & Staff Tools (2 weeks)
 - [ ] Dashboard: sales, occupancy, top movies (charts)
 - [ ] Manage users, bookings, promo codes
 - [ ] Staff QR validation page (HMAC verification + status update)
@@ -1162,7 +1162,7 @@ cinepath/
 
 **Deliverable:** full back-office
 
-### ⬛ Phase 6 — Quality, Security & Performance (1–2 weeks)
+### ⬛ Phase 6 - Quality, Security & Performance (1–2 weeks)
 - [ ] Unit, integration, and E2E tests (Playwright)
 - [ ] Security review against OWASP Top 10
 - [ ] Rate limiting, caching, image optimization
@@ -1172,7 +1172,7 @@ cinepath/
 
 **Deliverable:** production-ready build
 
-### ⬜ Phase 7 — Deployment & Launch (1 week)
+### ⬜ Phase 7 - Deployment & Launch (1 week)
 - [ ] CI/CD pipeline (GitHub Actions)
 - [ ] Production environment, domain, SSL
 - [ ] Monitoring (Sentry), backups, uptime checks
@@ -1181,7 +1181,7 @@ cinepath/
 
 **Deliverable:** live v1.0 🚀
 
-### 📱 Phase 8 — Mobile (Future)
+### 📱 Phase 8 - Mobile (Future)
 - [ ] Convert to PWA (manifest, service worker, push)
 - [ ] Wrap with Capacitor / TWA → Google Play (AAB)
 - [ ] Optional: React Native app using the same API
