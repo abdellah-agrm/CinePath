@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Sparkles, Calendar, MapPin, ChevronRight } from "lucide-react";
-import { getNowPlayingMovies } from "@/lib/tmdb";
+import { getNowPlayingMovies, FormattedMovie } from "@/lib/tmdb";
 import { formatPrice } from "@/lib/utils";
 
 export default async function HomePage() {
@@ -88,7 +88,7 @@ export default async function HomePage() {
 
         {/* Live Movie Cards from TMDB */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {movies.map((movie) => (
+          {movies.map((movie: FormattedMovie) => (
             <Link
               key={movie.slug}
               href={`/movies/${movie.slug}`}

@@ -57,11 +57,15 @@ export default function CheckoutPage() {
   const isTimerExpiring = timeLeft < 120; // 2 minutes left warning
 
   const handleApplyPromo = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (promoCode.trim().toUpperCase() === "CINEMA10") {
-      setPromoApplied(true);
-    } else {
-      alert("Invalid promo code. Try 'CINEMA10' for 10% off!");
+    try {
+      e.preventDefault();
+      if (promoCode.trim().toUpperCase() === "CINEMA10") {
+        setPromoApplied(true);
+      } else {
+        alert("Invalid promo code. Try 'CINEMA10' for 10% off!");
+      }
+    } catch (err) {
+      console.error("[Checkout] Error applying promo:", err);
     }
   };
 
@@ -70,21 +74,35 @@ export default function CheckoutPage() {
     : bookingData?.totalAmount || 0;
 
   const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      alert("Please provide an email address for your digital tickets.");
-      return;
-    }
+    try {
+      e.preventDefault();
+      if (!email) {
+        alert("Please provide an email address for your digital tickets.");
+        return;
+      }
 
-    setProcessing(true);
+      setProcessing(true);
 
-    // Simulate payment intent confirmation and ticket generation
-    setTimeout(() => {
+      // Simulate payment intent confirmation and ticket generation
+      setTimeout(() => {
+        try {
+          setProcessing(false);
+          const bookingRef = `CP-${Math.floor(10000 + Math.random() * 90000)}`;
+          try {
+            sessionStorage.setItem("last_booking_ref", bookingRef);
+          } catch (storageErr) {
+            console.warn("[Checkout] sessionStorage blocked or full:", storageErr);
+          }
+          router.push(`/tickets/${bookingRef}`);
+        } catch (innerErr) {
+          console.error("[Checkout] Error finalizing booking:", innerErr);
+          setProcessing(false);
+        }
+      }, 1500);
+    } catch (err) {
+      console.error("[Checkout] Error in payment submission:", err);
       setProcessing(false);
-      const bookingRef = `CP-${Math.floor(10000 + Math.random() * 90000)}`;
-      sessionStorage.setItem("last_booking_ref", bookingRef);
-      router.push(`/tickets/${bookingRef}`);
-    }, 1500);
+    }
   };
 
   return (

@@ -38,13 +38,18 @@ export function PWARegister() {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
+    try {
+      if (!deferredPrompt) return;
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+        setShowInstallBanner(false);
+      }
+      setDeferredPrompt(null);
+    } catch (err) {
+      console.error("[PWA] Error launching install prompt:", err);
       setShowInstallBanner(false);
     }
-    setDeferredPrompt(null);
   };
 
   if (!showInstallBanner) return null;

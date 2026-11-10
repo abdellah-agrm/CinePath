@@ -65,9 +65,15 @@ export default function AdminDashboardPage() {
   });
 
   const toggleCell = (rIdx: number, cIdx: number) => {
-    const updated = [...hallGrid.map((r) => [...r])];
-    updated[rIdx][cIdx] = paintBrush;
-    setHallGrid(updated);
+    try {
+      const updated = [...hallGrid.map((r) => [...r])];
+      if (updated[rIdx]) {
+        updated[rIdx][cIdx] = paintBrush;
+        setHallGrid(updated);
+      }
+    } catch (err) {
+      console.error("[Admin] Error toggling cell:", err);
+    }
   };
 
   return (

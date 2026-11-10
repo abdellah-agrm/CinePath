@@ -101,6 +101,18 @@ export default function MovieDetailPage() {
     );
   }
 
+  const handleShare = async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.share && movie) {
+        await navigator.share({ title: movie.title, url: window.location.href });
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        console.warn("[MovieDetail] Share action cancelled or failed:", err);
+      }
+    }
+  };
+
   const filteredShowtimes = movie.showtimes.filter((s) => {
     if (selectedFormat !== "ALL" && !s.format.includes(selectedFormat)) return false;
     return true;
@@ -136,11 +148,7 @@ export default function MovieDetailPage() {
               />
             </button>
             <button
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({ title: movie.title, url: window.location.href });
-                }
-              }}
+              onClick={handleShare}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-background/60 backdrop-blur text-white hover:bg-background/80 transition"
             >
               <Share2 className="h-5 w-5" />

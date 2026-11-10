@@ -101,8 +101,12 @@ export default function StaffQRValidationPage() {
   };
 
   const resetScanner = () => {
-    setResult(null);
-    setInputCode("");
+    try {
+      setResult(null);
+      setInputCode("");
+    } catch (err) {
+      console.error("[StaffScanner] Error resetting scanner:", err);
+    }
   };
 
   return (

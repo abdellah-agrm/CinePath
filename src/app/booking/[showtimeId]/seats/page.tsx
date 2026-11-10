@@ -114,27 +114,31 @@ export default function SeatSelectionPage() {
   }, [showtimeId]);
 
   const toggleSeat = (seat: SeatItem) => {
-    if (seat.status !== "ACTIVE" || seat.isBooked || seat.isLocked) return;
+    try {
+      if (seat.status !== "ACTIVE" || seat.isBooked || seat.isLocked) return;
 
-    const exists = selectedSeats.find((s) => s.seatId === seat.id);
-    if (exists) {
-      setSelectedSeats(selectedSeats.filter((s) => s.seatId !== seat.id));
-    } else {
-      if (selectedSeats.length >= 8) {
-        setErrorMessage("You can select up to 8 seats per booking.");
-        return;
+      const exists = selectedSeats.find((s) => s.seatId === seat.id);
+      if (exists) {
+        setSelectedSeats(selectedSeats.filter((s) => s.seatId !== seat.id));
+      } else {
+        if (selectedSeats.length >= 8) {
+          setErrorMessage("You can select up to 8 seats per booking.");
+          return;
+        }
+        setErrorMessage(null);
+        const seatPrice = (showtime?.basePrice || 90) + seat.priceModifier;
+        setSelectedSeats([
+          ...selectedSeats,
+          {
+            seatId: seat.id,
+            label: `${seat.rowLabel}${seat.seatNumber}`,
+            ticketType: "NORMAL",
+            price: seatPrice,
+          },
+        ]);
       }
-      setErrorMessage(null);
-      const seatPrice = (showtime?.basePrice || 90) + seat.priceModifier;
-      setSelectedSeats([
-        ...selectedSeats,
-        {
-          seatId: seat.id,
-          label: `${seat.rowLabel}${seat.seatNumber}`,
-          ticketType: "NORMAL",
-          price: seatPrice,
-        },
-      ]);
+    } catch (err) {
+      console.error("[SeatMap] Error toggling seat:", err);
     }
   };
 
@@ -142,42 +146,50 @@ export default function SeatSelectionPage() {
     seatId: string,
     type: "NORMAL" | "STUDENT" | "SENIOR"
   ) => {
-    setSelectedSeats((prev) =>
-      prev.map((item) => {
-        if (item.seatId === seatId) {
-          const seat = seats.find((s) => s.id === seatId);
-          const base = (showtime?.basePrice || 90) + (seat?.priceModifier || 0);
-          let finalPrice = base;
-          if (type === "STUDENT") finalPrice = Math.max(0, base - 15);
-          if (type === "SENIOR") finalPrice = Math.max(0, base - 20);
-          return { ...item, ticketType: type, price: finalPrice };
-        }
-        return item;
-      })
-    );
+    try {
+      setSelectedSeats((prev) =>
+        prev.map((item) => {
+          if (item.seatId === seatId) {
+            const seat = seats.find((s) => s.id === seatId);
+            const base = (showtime?.basePrice || 90) + (seat?.priceModifier || 0);
+            let finalPrice = base;
+            if (type === "STUDENT") finalPrice = Math.max(0, base - 15);
+            if (type === "SENIOR") finalPrice = Math.max(0, base - 20);
+            return { ...item, ticketType: type, price: finalPrice };
+          }
+          return item;
+        })
+      );
+    } catch (err) {
+      console.error("[SeatMap] Error updating ticket type:", err);
+    }
   };
 
   const pickBestSeats = (count = 2) => {
-    const available = seats.filter(
-      (s) => s.status === "ACTIVE" && !s.isBooked && !s.isLocked
-    );
-    // Prefer row D or C (center)
-    const sorted = [...available].sort((a, b) => {
-      const centerCol = 5.5;
-      const distA = Math.abs(a.gridCol - centerCol) + Math.abs(a.gridRow - 4);
-      const distB = Math.abs(b.gridCol - centerCol) + Math.abs(b.gridRow - 4);
-      return distA - distB;
-    });
+    try {
+      const available = seats.filter(
+        (s) => s.status === "ACTIVE" && !s.isBooked && !s.isLocked
+      );
+      // Prefer row D or C (center)
+      const sorted = [...available].sort((a, b) => {
+        const centerCol = 5.5;
+        const distA = Math.abs(a.gridCol - centerCol) + Math.abs(a.gridRow - 4);
+        const distB = Math.abs(b.gridCol - centerCol) + Math.abs(b.gridRow - 4);
+        return distA - distB;
+      });
 
-    const chosen = sorted.slice(0, count);
-    const mapped = chosen.map((s) => ({
-      seatId: s.id,
-      label: `${s.rowLabel}${s.seatNumber}`,
-      ticketType: "NORMAL" as const,
-      price: (showtime?.basePrice || 90) + s.priceModifier,
-    }));
+      const chosen = sorted.slice(0, count);
+      const mapped = chosen.map((s) => ({
+        seatId: s.id,
+        label: `${s.rowLabel}${s.seatNumber}`,
+        ticketType: "NORMAL" as const,
+        price: (showtime?.basePrice || 90) + s.priceModifier,
+      }));
 
-    setSelectedSeats(mapped);
+      setSelectedSeats(mapped);
+    } catch (err) {
+      console.error("[SeatMap] Error picking best seats:", err);
+    }
   };
 
   const totalAmount = selectedSeats.reduce((acc, s) => acc + s.price, 0);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getNowPlayingMovies } from "@/lib/tmdb";
+import { getNowPlayingMovies, FormattedMovie } from "@/lib/tmdb";
 
 export async function GET(request: Request) {
   try {
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     // 2. If database has no movies yet, fetch directly from TMDB
     if (movies.length === 0) {
       const tmdbMovies = await getNowPlayingMovies();
-      movies = tmdbMovies.map((m) => ({
+      movies = tmdbMovies.map((m: FormattedMovie) => ({
         id: m.slug,
         title: m.title,
         slug: m.slug,

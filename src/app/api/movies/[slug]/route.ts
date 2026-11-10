@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getNowPlayingMovies } from "@/lib/tmdb";
+import { getNowPlayingMovies, FormattedMovie } from "@/lib/tmdb";
 
 export async function GET(
   _request: Request,
@@ -63,7 +63,7 @@ export async function GET(
 
     // 2. Fallback to TMDB data
     const tmdbMovies = await getNowPlayingMovies();
-    const movie = tmdbMovies.find((m) => m.slug === slug) || tmdbMovies[0];
+    const movie = tmdbMovies.find((m: FormattedMovie) => m.slug === slug) || tmdbMovies[0];
 
     return NextResponse.json({
       success: true,

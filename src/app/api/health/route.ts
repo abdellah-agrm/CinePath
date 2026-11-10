@@ -10,20 +10,26 @@ export async function GET() {
 
   let allHealthy = true;
 
-  // 1. Check PostgreSQL Database Connectivity
+  // 1. Check PostgreSQL Database Connectivity with fast 1.5s timeout
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    const dbTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("DB Timeout")), 1500)
+    );
+    await Promise.race([prisma.$queryRaw`SELECT 1`, dbTimeout]);
     checks.database = "connected";
-  } catch (error) {
+  } catch {
     checks.database = "disconnected";
     allHealthy = false;
   }
 
-  // 2. Check Redis Cache / Locking Connectivity
+  // 2. Check Redis Cache / Locking Connectivity with fast 1.5s timeout
   try {
-    const pong = await redis.ping();
+    const redisTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Redis Timeout")), 1500)
+    );
+    const pong = await Promise.race([redis.ping(), redisTimeout]);
     checks.redis = pong === "PONG" ? "connected" : "error";
-  } catch (error) {
+  } catch {
     checks.redis = "disconnected";
     allHealthy = false;
   }
@@ -41,4 +47,3 @@ export async function GET() {
     { status: allHealthy ? 200 : 503 }
   );
 }
-

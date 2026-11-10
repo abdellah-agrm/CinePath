@@ -46,8 +46,8 @@ export async function POST(req: Request) {
       });
 
       if (!booking) {
-        console.error(`Booking ${bookingId} not found`);
-        return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+        console.warn(`Booking ${bookingId} not found, acknowledging webhook.`);
+        return NextResponse.json({ received: true, warning: "Booking not found" });
       }
 
       // 1. Check if the booking was already confirmed

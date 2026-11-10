@@ -12,8 +12,13 @@ export function generateTicketHmac(
   showtimeId: string,
   bookingRef: string
 ): string {
-  const data = `${ticketId}:${showtimeId}:${bookingRef}`;
-  return crypto.createHmac("sha256", QR_SECRET).update(data).digest("hex");
+  try {
+    const data = `${ticketId}:${showtimeId}:${bookingRef}`;
+    return crypto.createHmac("sha256", QR_SECRET).update(data).digest("hex");
+  } catch (error) {
+    console.error("[HMAC] Error generating signature:", error);
+    return "";
+  }
 }
 
 /**
@@ -25,14 +30,17 @@ export function verifyTicketHmac(
   bookingRef: string,
   providedHmac: string
 ): boolean {
-  const expectedHmac = generateTicketHmac(ticketId, showtimeId, bookingRef);
   try {
+    if (!ticketId || !showtimeId || !bookingRef || !providedHmac) return false;
+    const expectedHmac = generateTicketHmac(ticketId, showtimeId, bookingRef);
+    if (!expectedHmac) return false;
+
     return crypto.timingSafeEqual(
       Buffer.from(expectedHmac, "hex"),
       Buffer.from(providedHmac, "hex")
     );
-  } catch {
+  } catch (error) {
+    console.warn("[HMAC] Signature verification rejected:", error);
     return false;
   }
 }
-
