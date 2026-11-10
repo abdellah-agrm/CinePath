@@ -1,0 +1,16 @@
+{
+  "appId": "com.cinepath.app",
+  "appName": "CinePath",
+  "webDir": "out",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://cinepath.com",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}
+

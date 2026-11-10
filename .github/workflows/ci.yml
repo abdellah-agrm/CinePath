@@ -1,0 +1,71 @@
+name: CinePath CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-and-build:
+    name: Lint, TypeCheck & Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cinepath_user
+          POSTGRES_PASSWORD: cinepath_password
+          POSTGRES_DB: cinepath_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: "postgresql://cinepath_user:cinepath_password@localhost:5432/cinepath_db?schema=public"
+      REDIS_HOST: "localhost"
+      REDIS_PORT: 6379
+      JWT_SECRET: "test_jwt_secret_min32chars_cinepath"
+      QR_SECRET: "test_qr_secret_min32chars_cinepath"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Validate Prisma Schema
+        run: npx prisma validate
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Type-Check (TypeScript)
+        run: npx tsc --noEmit
+
+      - name: Build Next.js Application
+        run: npm run build
+

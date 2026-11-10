@@ -1,0 +1,284 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum MovieStatus {
+  COMING_SOON
+  NOW_SHOWING
+  ARCHIVED
+}
+
+enum HallType {
+  STANDARD
+  IMAX
+  VIP
+  THREE_D
+}
+
+enum SeatType {
+  STANDARD
+  VIP
+  COUPLE
+  WHEELCHAIR
+}
+
+enum SeatStatus {
+  ACTIVE
+  BROKEN
+  AISLE
+}
+
+enum ProjectionFormat {
+  TWO_D
+  THREE_D
+  IMAX
+}
+
+enum ShowtimeStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+  USED
+  REFUNDED
+}
+
+enum TicketStatus {
+  ACTIVE
+  USED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id           String    @id @default(uuid())
+  fullName     String    @map("full_name")
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  phone        String?
+  role         Role      @default(CUSTOMER)
+  isVerified   Boolean   @default(false) @map("is_verified")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  bookings     Booking[]
+  reviews      Review[]
+
+  @@map("users")
+}
+
+model Movie {
+  id               String       @id @default(uuid())
+  title            String
+  slug             String       @unique
+  synopsis         String       @db.Text
+  durationMin      Int          @map("duration_min")
+  originalLanguage String       @default("en") @map("original_language")
+  ageRating        String       @default("12+") @map("age_rating")
+  releaseDate      DateTime     @map("release_date")
+  posterUrl        String       @map("poster_url")
+  trailerUrl       String?      @map("trailer_url")
+  status           MovieStatus  @default(NOW_SHOWING)
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  genres           MovieGenre[]
+  showtimes        Showtime[]
+  reviews          Review[]
+
+  @@index([status])
+  @@map("movies")
+}
+
+model Genre {
+  id     String       @id @default(uuid())
+  name   String       @unique
+  movies MovieGenre[]
+
+  @@map("genres")
+}
+
+model MovieGenre {
+  movieId String @map("movie_id")
+  genreId String @map("genre_id")
+
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([movieId, genreId])
+  @@map("movie_genres")
+}
+
+model Cinema {
+  id      String   @id @default(uuid())
+  name    String
+  slug    String   @unique
+  city    String
+  address String
+  phone   String?
+  halls   Hall[]
+
+  @@map("cinemas")
+}
+
+model Hall {
+  id        String    @id @default(uuid())
+  cinemaId  String    @map("cinema_id")
+  name      String
+  totalRows Int       @map("total_rows")
+  totalCols Int       @map("total_cols")
+  capacity  Int
+  type      HallType  @default(STANDARD)
+
+  cinema    Cinema     @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+  seats     Seat[]
+  showtimes Showtime[]
+
+  @@map("halls")
+}
+
+model Seat {
+  id            String     @id @default(uuid())
+  hallId        String     @map("hall_id")
+  rowLabel      String     @map("row_label")
+  seatNumber    Int        @map("seat_number")
+  gridRow       Int        @map("grid_row")
+  gridCol       Int        @map("grid_col")
+  type          SeatType   @default(STANDARD)
+  status        SeatStatus @default(ACTIVE)
+  priceModifier Decimal    @default(0.00) @map("price_modifier") @db.Decimal(10, 2)
+
+  hall    Hall     @relation(fields: [hallId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+
+  @@unique([hallId, gridRow, gridCol], name: "uq_hall_grid_position")
+  @@unique([hallId, rowLabel, seatNumber], name: "uq_hall_seat_label")
+  @@map("seats")
+}
+
+model Showtime {
+  id               String           @id @default(uuid())
+  movieId          String           @map("movie_id")
+  hallId           String           @map("hall_id")
+  startTime        DateTime         @map("start_time")
+  endTime          DateTime         @map("end_time")
+  basePrice        Decimal          @map("base_price") @db.Decimal(10, 2)
+  audioLanguage    String           @default("VOSTFR") @map("audio_language")
+  subtitleLanguage String           @default("FR") @map("subtitle_language")
+  format           ProjectionFormat @default(TWO_D)
+  status           ShowtimeStatus   @default(SCHEDULED)
+
+  movie    Movie     @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  hall     Hall      @relation(fields: [hallId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  tickets  Ticket[]
+
+  @@index([movieId, startTime])
+  @@index([hallId, startTime])
+  @@map("showtimes")
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  userId      String?       @map("user_id")
+  guestEmail  String?       @map("guest_email")
+  showtimeId  String        @map("showtime_id")
+  promoCodeId String?       @map("promo_code_id")
+  reference   String        @unique
+  status      BookingStatus @default(PENDING)
+  totalAmount Decimal       @map("total_amount") @db.Decimal(10, 2)
+  expiresAt   DateTime      @map("expires_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  showtime  Showtime   @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  tickets   Ticket[]
+  payment   Payment?
+
+  @@index([userId, createdAt])
+  @@index([status, expiresAt])
+  @@map("bookings")
+}
+
+model Ticket {
+  id         String       @id @default(uuid())
+  bookingId  String       @map("booking_id")
+  seatId     String       @map("seat_id")
+  showtimeId String       @map("showtime_id")
+  qrPayload  String       @unique @map("qr_payload")
+  price      Decimal      @db.Decimal(10, 2)
+  status     TicketStatus @default(ACTIVE)
+  usedAt     DateTime?    @map("used_at")
+
+  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seat     Seat     @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  showtime Showtime @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+
+  // uq_active_ticket_seat_showtime is enforced via partial index in PostgreSQL migration
+  @@map("tickets")
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  bookingId   String        @unique @map("booking_id")
+  providerRef String        @unique @map("provider_ref")
+  amount      Decimal       @db.Decimal(10, 2)
+  currency    String        @default("MAD")
+  status      PaymentStatus @default(PENDING)
+  paidAt      DateTime?     @map("paid_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model PromoCode {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  discountPercent Int       @map("discount_percent")
+  expiresAt       DateTime  @map("expires_at")
+  maxUses         Int       @map("max_uses")
+  currentUses     Int       @default(0) @map("current_uses")
+  bookings        Booking[]
+
+  @@map("promo_codes")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  movieId   String   @map("movie_id")
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
