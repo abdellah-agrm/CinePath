@@ -14,7 +14,10 @@ import {
   Clock,
   ArrowLeft,
   Volume2,
+  Scan,
+  Shield,
 } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 
 type ValidationResult = {
   status: "VALID" | "INVALID" | "ALREADY_USED";
@@ -31,6 +34,7 @@ type ValidationResult = {
 } | null;
 
 export default function StaffQRValidationPage() {
+  const { user, role } = useAuth();
   const [inputCode, setInputCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ValidationResult>(null);
@@ -121,10 +125,26 @@ export default function StaffQRValidationPage() {
             <ArrowLeft className="h-4 w-4" />
             Exit Staff Portal
           </Link>
-          <div className="flex items-center gap-1.5 rounded-full bg-primary/20 px-3 py-1 text-[11px] font-bold text-primary">
+          <div className="flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-[11px] font-bold text-amber-400 border border-amber-500/30">
+            <Scan className="h-3.5 w-3.5" />
             <span>Gate Scanner</span>
           </div>
         </div>
+
+        {/* Staff operator badge */}
+        {user && (
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card/60 p-2.5 px-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-[10px] font-bold text-amber-400">
+                {user.fullName.charAt(0)}
+              </span>
+              <span className="text-white font-medium">{user.fullName}</span>
+            </div>
+            <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+              {user.role}
+            </span>
+          </div>
+        )}
 
         {/* Big Status Display when Result Available */}
         {result ? (

@@ -127,7 +127,49 @@ async function main() {
     },
   });
 
-  console.log("✅ Seed completed successfully!");
+  // 6. Users (RBAC: Admin, Staff, Customer)
+  const bcrypt = require("bcryptjs");
+  const adminHash = await bcrypt.hash("Admin123!", 12);
+  const staffHash = await bcrypt.hash("Staff123!", 12);
+  const customerHash = await bcrypt.hash("Customer123!", 12);
+
+  await prisma.user.upsert({
+    where: { email: "admin@cinepath.com" },
+    update: { role: "ADMIN", passwordHash: adminHash },
+    create: {
+      email: "admin@cinepath.com",
+      fullName: "Abdellah Agourram (Admin)",
+      passwordHash: adminHash,
+      role: "ADMIN",
+      isVerified: true,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "staff@cinepath.com" },
+    update: { role: "STAFF", passwordHash: staffHash },
+    create: {
+      email: "staff@cinepath.com",
+      fullName: "Cinema Gate Staff",
+      passwordHash: staffHash,
+      role: "STAFF",
+      isVerified: true,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "customer@cinepath.com" },
+    update: { role: "CUSTOMER", passwordHash: customerHash },
+    create: {
+      email: "customer@cinepath.com",
+      fullName: "Sara Mansouri",
+      passwordHash: customerHash,
+      role: "CUSTOMER",
+      isVerified: true,
+    },
+  });
+
+  console.log("✅ Seed completed successfully! Admin, Staff, and Customer users created.");
 }
 
 main()

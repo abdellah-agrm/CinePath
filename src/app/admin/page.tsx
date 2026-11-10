@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   BarChart3,
@@ -16,17 +16,77 @@ import {
   Shield,
   Layers,
   RefreshCw,
+  UserCheck,
+  Loader2,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { useAuth, UserRole } from "@/context/auth-context";
 
 type CellType = "STANDARD" | "VIP" | "WHEELCHAIR" | "AISLE" | "BROKEN";
 
+interface AdminUserItem {
+  id: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  createdAt: string;
+  bookingsCount: number;
+}
+
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "halls" | "showtimes">(
+  const { user, role } = useAuth();
+  const [activeTab, setActiveTab] = useState<"overview" | "halls" | "showtimes" | "users">(
     "overview"
   );
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  // User Management State
+  const [usersList, setUsersList] = useState<AdminUserItem[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const res = await fetch("/api/admin/users");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setUsersList(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to load users:", err);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "users") {
+      fetchUsers();
+    }
+  }, [activeTab]);
+
+  const handleRoleChange = async (userId: string, newRole: UserRole) => {
+    setUpdatingUserId(userId);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, newRole }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUsersList((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
+        );
+      }
+    } catch (err) {
+      console.error("Error updating role:", err);
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
 
   const handleSyncTMDB = async () => {
     setSyncing(true);
@@ -138,6 +198,16 @@ export default function AdminDashboardPage() {
         >
           <Calendar className="h-4 w-4" />
           Showtimes & Pricing
+        </button>
+        <button
+          onClick={() => setActiveTab("users")}
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 transition ${activeTab === "users"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-white"
+            }`}
+        >
+          <Users className="h-4 w-4" />
+          User & Role Management
         </button>
       </div>
 
@@ -445,6 +515,99 @@ export default function AdminDashboardPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Tab 4: User & Role Management */}
+      {activeTab === "users" && (
+        <div className="mt-8 rounded-3xl border border-border bg-card p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <span>Registered Users & Role Assignment</span>
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Assign administrative, staff gatekeeper, or customer roles across CinePath accounts
+              </p>
+            </div>
+            <button
+              onClick={fetchUsers}
+              disabled={usersLoading}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background/50 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${usersLoading ? "animate-spin" : ""}`} />
+              <span>Refresh Accounts</span>
+            </button>
+          </div>
+
+          {usersLoading && usersList.length === 0 ? (
+            <div className="py-12 text-center">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+              <p className="mt-2 text-xs text-muted-foreground">Loading user directory...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-muted-foreground">
+                <thead className="border-b border-border bg-background/50 uppercase text-[10px] text-white">
+                  <tr>
+                    <th className="p-3">User</th>
+                    <th className="p-3">Email</th>
+                    <th className="p-3">Current Role</th>
+                    <th className="p-3">Bookings</th>
+                    <th className="p-3">Role Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {usersList.map((u) => (
+                    <tr key={u.id} className="hover:bg-muted/20 transition">
+                      <td className="p-3 font-semibold text-white flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+                          {u.fullName.charAt(0).toUpperCase()}
+                        </div>
+                        <span>{u.fullName}</span>
+                      </td>
+                      <td className="p-3 font-mono text-[11px] text-muted-foreground">{u.email}</td>
+                      <td className="p-3">
+                        {u.role === "ADMIN" ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-400 border border-red-500/20">
+                            <Shield className="h-3 w-3" /> ADMIN
+                          </span>
+                        ) : u.role === "STAFF" ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-amber-500/20">
+                            STAFF
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary border border-primary/20">
+                            CUSTOMER
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 font-semibold text-white">{u.bookingsCount}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={u.role}
+                            disabled={updatingUserId === u.id}
+                            onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
+                            aria-label={`Change role for ${u.fullName}`}
+                            className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-white focus:border-primary focus:outline-none"
+                          >
+                            <option value="CUSTOMER">CUSTOMER</option>
+                            <option value="STAFF">STAFF</option>
+                            <option value="ADMIN">ADMIN</option>
+                          </select>
+                          {updatingUserId === u.id && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

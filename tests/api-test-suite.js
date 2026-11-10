@@ -1,22 +1,35 @@
 /**
  * CinePath Comprehensive Backend API Test Suite
- * Tests all REST endpoints live against the running server.
+ * Tests all REST endpoints live against the running server:
+ * Catalog, Seat Locking, Tickets, Webhooks, and Authentication (RBAC).
  */
 
 const BASE_URL = "http://localhost:3000";
+
+let authCookie = "";
 
 async function request(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
   const start = Date.now();
   try {
+    const headers = {
+      "Content-Type": "application/json",
+      ...(authCookie ? { Cookie: authCookie } : {}),
+      ...(options.headers || {}),
+    };
+
     const res = await fetch(url, {
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
+      headers,
     });
     const duration = Date.now() - start;
+
+    const setCookie = res.headers.get("set-cookie");
+    if (setCookie) {
+      // Extract first cookie segment
+      authCookie = setCookie.split(";")[0];
+    }
+
     let data;
     try {
       data = await res.json();
@@ -28,6 +41,7 @@ async function request(endpoint, options = {}) {
       ok: res.ok,
       duration,
       data,
+      setCookie,
     };
   } catch (err) {
     return {
@@ -51,7 +65,7 @@ async function runTestSuite() {
   {
     process.stdout.write("1. Testing GET /api/health ... ");
     const res = await request("/api/health");
-    const passed = res.status === 200 || res.status === 503; // 503 if DB offline in demo mode
+    const passed = res.status === 200 || res.status === 503;
     results.push({ name: "GET /api/health", passed, ...res });
     console.log(passed ? `✅ PASS (${res.status} in ${res.duration}ms)` : `❌ FAIL (${res.status})`);
   }
@@ -173,6 +187,85 @@ async function runTestSuite() {
     );
   }
 
+  // TEST 9: Auth Registration (New Customer)
+  {
+    process.stdout.write("9. Testing POST /api/auth/register ... ");
+    const testEmail = `test_customer_${Date.now()}@cinepath.com`;
+    const res = await request("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({
+        fullName: "Test Automated Customer",
+        email: testEmail,
+        password: "Password123!",
+      }),
+    });
+    const passed = res.status === 200 && res.data?.success && res.data?.user?.role === "CUSTOMER";
+    results.push({ name: "POST /api/auth/register", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Registered user "${res.data.user.email}" with role ${res.data.user.role} in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.error || res.error})`
+    );
+  }
+
+  // TEST 10: Auth Login (Admin Role)
+  {
+    process.stdout.write("10. Testing POST /api/auth/login (Admin) ... ");
+    const res = await request("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "admin@cinepath.com",
+        password: "Admin123!",
+      }),
+    });
+    const passed = res.status === 200 && res.data?.success && res.data?.user?.role === "ADMIN";
+    results.push({ name: "POST /api/auth/login", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Authenticated as "${res.data.user.fullName}" (${res.data.user.role}) in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.error || res.error})`
+    );
+  }
+
+  // TEST 11: Auth Session Check (GET /api/auth/me)
+  {
+    process.stdout.write("11. Testing GET /api/auth/me ... ");
+    const res = await request("/api/auth/me");
+    const passed = res.status === 200 && res.data?.authenticated && res.data?.user?.role === "ADMIN";
+    results.push({ name: "GET /api/auth/me", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Verified session for ${res.data.user.email} (${res.data.user.role}) in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.error || res.error})`
+    );
+  }
+
+  // TEST 12: Admin User Management (GET /api/admin/users)
+  {
+    process.stdout.write("12. Testing GET /api/admin/users (RBAC Guard) ... ");
+    const res = await request("/api/admin/users");
+    const passed = res.status === 200 && res.data?.success && Array.isArray(res.data?.data);
+    results.push({ name: "GET /api/admin/users", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Returned ${res.data.data.length} registered accounts in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.error || res.error})`
+    );
+  }
+
+  // TEST 13: Auth Logout (POST /api/auth/logout)
+  {
+    process.stdout.write("13. Testing POST /api/auth/logout ... ");
+    const res = await request("/api/auth/logout", { method: "POST" });
+    const passed = res.status === 200 && res.data?.success;
+    results.push({ name: "POST /api/auth/logout", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Cookie cleared in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.error || res.error})`
+    );
+  }
+
   // SUMMARY REPORT
   console.log("\n===============================================================");
   const passedCount = results.filter((r) => r.passed).length;
@@ -180,11 +273,10 @@ async function runTestSuite() {
   console.log("===============================================================");
 
   if (passedCount === results.length) {
-    console.log("🎉  ALL BACKEND APIS ARE 100% HEALTHY AND OPERATIONAL!");
+    console.log("🎉  ALL 13 BACKEND APIS & AUTH/RBAC ENDPOINTS ARE 100% HEALTHY!");
   } else {
     process.exit(1);
   }
 }
 
 runTestSuite();
-
