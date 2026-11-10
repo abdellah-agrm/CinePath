@@ -46,12 +46,6 @@ export default function RootLayout({
                 <Link href="/privacy" className="hover:text-white transition">
                   Privacy Policy
                 </Link>
-                <Link href="/staff/validate" className="text-amber-400 hover:underline font-semibold">
-                  Staff Scanner
-                </Link>
-                <Link href="/admin" className="text-red-400 hover:underline font-semibold">
-                  Admin Dashboard
-                </Link>
               </div>
             </div>
           </footer>
