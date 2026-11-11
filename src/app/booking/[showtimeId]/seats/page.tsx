@@ -238,6 +238,7 @@ export default function SeatSelectionPage() {
       hallName: showtime?.hallName || "Hall 1 (IMAX)",
       startTime: cleanStartTime,
       format: showtime?.format || "IMAX 2D",
+      posterUrl: (showtime as any)?.posterUrl || "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
       seats: selectedSeats,
       totalAmount,
     };

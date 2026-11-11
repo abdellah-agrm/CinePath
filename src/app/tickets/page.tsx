@@ -10,6 +10,7 @@ interface TicketBooking {
   reference: string;
   movieTitle: string;
   poster?: string;
+  posterUrl?: string;
   cinema: string;
   hall: string;
   date?: string;
@@ -104,8 +105,17 @@ export default function MyTicketsPage() {
               className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-border bg-card p-5 transition hover:border-primary/40 hover:shadow-lg"
             >
               <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary">
-                  <Film className="h-8 w-8" />
+                <div className="h-16 w-12 shrink-0 rounded-xl overflow-hidden bg-zinc-800 border border-border shadow-sm flex items-center justify-center">
+                  {booking.posterUrl || booking.poster ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={booking.posterUrl || booking.poster}
+                      alt={booking.movieTitle}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <Film className="h-6 w-6 text-primary" />
+                  )}
                 </div>
 
                 <div>

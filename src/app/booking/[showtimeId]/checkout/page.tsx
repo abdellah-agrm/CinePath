@@ -171,6 +171,7 @@ export default function CheckoutPage() {
               ? bookingData.seats.map((s) => s.label)
               : ["A8"],
           totalAmount: finalAmount,
+          posterUrl: (bookingData as any)?.posterUrl || "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
           status: "UPCOMING",
           paidAt: new Date().toISOString(),
           customerEmail: email,

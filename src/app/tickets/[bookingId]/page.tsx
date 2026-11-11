@@ -5,16 +5,15 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import {
-  CheckCircle,
   Download,
   Calendar,
-  MapPin,
-  Clock,
-  Film,
   ArrowRight,
   ShieldCheck,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { generateTicketHmac } from "@/lib/hmac";
+import { formatPrice } from "@/lib/utils";
 
 interface BookingDetail {
   id: string;
@@ -27,11 +26,12 @@ interface BookingDetail {
   seats: string[];
   seatLabels: string[];
   totalAmount: number;
+  posterUrl?: string;
 }
 
 export default function TicketConfirmationPage() {
   const params = useParams();
-  const bookingRef = (params.bookingId as string) || "CP-94812";
+  const bookingRef = (params.bookingId as string) || "CP-84920";
 
   const [booking, setBooking] = useState<BookingDetail>({
     id: bookingRef,
@@ -41,10 +41,13 @@ export default function TicketConfirmationPage() {
     cinema: "CinePath Anfa Multiplex",
     time: "Today · 20:00",
     format: "IMAX 2D · VOSTFR",
-    seats: ["Seat A8 (Normal)"],
-    seatLabels: ["A8"],
-    totalAmount: 90,
+    seats: ["Seat A8 (Standard)", "Seat A9 (Standard)"],
+    seatLabels: ["A8", "A9"],
+    totalAmount: 180,
+    posterUrl: "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
   });
+
+  const [walletSaved, setWalletSaved] = useState(false);
 
   useEffect(() => {
     try {
@@ -53,7 +56,6 @@ export default function TicketConfirmationPage() {
         const parsed = JSON.parse(stored);
         setBooking(parsed);
       } else {
-        // Check if there is an item in user's ticket list
         const listRaw = localStorage.getItem("cinepath_user_tickets");
         if (listRaw) {
           const list = JSON.parse(listRaw);
@@ -82,13 +84,100 @@ export default function TicketConfirmationPage() {
     }
   };
 
-  const handleAddToCalendar = () => {
-    alert(`Calendar reminder added for ${booking.movieTitle} (${booking.time})!`);
+  // Google Wallet Pass Generator & Downloader
+  const handleSaveToGoogleWallet = () => {
+    try {
+      const googleWalletPass = {
+        iss: "CinePath Multiplex",
+        aud: "google",
+        typ: "savetoandroidpay",
+        iat: Math.floor(Date.now() / 1000),
+        payload: {
+          eventTicketObjects: [
+            {
+              id: `cinepath.${booking.reference}`,
+              classId: "cinepath.cinema_admission_class",
+              eventName: { defaultValue: { language: "en", value: booking.movieTitle } },
+              venue: {
+                name: { defaultValue: { language: "en", value: `${booking.cinema} - ${booking.hall}` } },
+              },
+              dateTime: { start: booking.time },
+              seatInfo: {
+                seat: { defaultValue: { language: "en", value: booking.seatLabels.join(", ") } },
+              },
+              ticketHolderName: "CinePath Guest",
+              barcode: {
+                type: "QR_CODE",
+                value: qrPayload,
+                alternateText: booking.reference,
+              },
+              state: "ACTIVE",
+            },
+          ],
+        },
+      };
+
+      // Trigger automatic Google Wallet pass JSON download
+      const blob = new Blob([JSON.stringify(googleWalletPass, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Google-Wallet-CinePath-${booking.reference}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setWalletSaved(true);
+      setTimeout(() => setWalletSaved(false), 5000);
+    } catch (err) {
+      console.error("Error creating Google Wallet pass:", err);
+    }
   };
 
+  const handleAddToCalendar = () => {
+    const icsData = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//CinePath//Cinema Ticketing//EN",
+      "BEGIN:VEVENT",
+      `SUMMARY:🎬 ${booking.movieTitle} at ${booking.cinema}`,
+      `DESCRIPTION:Showtime: ${booking.time}\\nHall: ${booking.hall}\\nSeats: ${booking.seatLabels.join(", ")}\\nBooking Ref: ${booking.reference}`,
+      `LOCATION:${booking.cinema}`,
+      "STATUS:CONFIRMED",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const blob = new Blob([icsData], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `CinePath-${booking.movieTitle.replace(/\s+/g, "-")}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Reusable saw-tooth / zig-zag SVG tear edge
+  const SawtoothEdge = ({ isBottom = false }: { isBottom?: boolean }) => (
+    <div className={`w-full overflow-hidden leading-none ${!isBottom ? "rotate-180" : ""}`}>
+      <svg
+        viewBox="0 0 1200 24"
+        preserveAspectRatio="none"
+        className="w-full h-3 sm:h-4 text-white fill-current block"
+      >
+        <path d="M0,0 L15,24 L30,0 L45,24 L60,0 L75,24 L90,0 L105,24 L120,0 L135,24 L150,0 L165,24 L180,0 L195,24 L210,0 L225,24 L240,0 L255,24 L270,0 L285,24 L300,0 L315,24 L330,0 L345,24 L360,0 L375,24 L390,0 L405,24 L420,0 L435,24 L450,0 L465,24 L480,0 L495,24 L510,0 L525,24 L540,0 L555,24 L570,0 L585,24 L600,0 L615,24 L630,0 L645,24 L660,0 L675,24 L690,0 L705,24 L720,0 L735,24 L750,0 L765,24 L780,0 L795,24 L810,0 L825,24 L840,0 L855,24 L870,0 L885,24 L900,0 L915,24 L930,0 L945,24 L960,0 L975,24 L990,0 L1005,24 L1020,0 L1035,24 L1050,0 L1065,24 L1080,0 L1095,24 L1110,0 L1125,24 L1140,0 L1155,24 L1170,0 L1185,24 L1200,0 L1200,24 L0,24 Z" />
+      </svg>
+    </div>
+  );
+
   return (
-    <div className="mx-auto max-w-xl px-4 py-12 pb-24 text-center print:py-0 print:max-w-md">
-      {/* Print Specific CSS to completely hide Navbars, Footers and prevent overlapping */}
+    <div className="min-h-screen bg-neutral-950 py-12 px-4 flex flex-col items-center justify-center print:bg-white print:p-0">
+      {/* Strict Print CSS: isolates the white receipt ticket with saw-tooth edges on paper */}
       <style jsx global>{`
         @media print {
           header,
@@ -100,145 +189,247 @@ export default function TicketConfirmationPage() {
             display: none !important;
           }
           body {
-            background-color: #ffffff !important;
-            color: #000000 !important;
+            background: #ffffff !important;
             padding: 0 !important;
             margin: 0 !important;
           }
-          .ticket-card {
+          .ticket-receipt-card {
             box-shadow: none !important;
-            border: 2px solid #e2e8f0 !important;
-            background-color: #ffffff !important;
-            color: #0f172a !important;
+            margin: 0 auto !important;
+            max-width: 420px !important;
             page-break-inside: avoid !important;
-            margin: 20px auto !important;
-          }
-          .ticket-card * {
-            color: #0f172a !important;
-          }
-          .print-badge {
-            background-color: #f1f5f9 !important;
-            border: 1px solid #cbd5e1 !important;
           }
         }
       `}</style>
 
-      {/* Success Banner */}
-      <div className="no-print">
-        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 mb-4 ring-8 ring-emerald-500/5">
-          <CheckCircle className="h-10 w-10" />
-        </div>
-
-        <h1 className="text-2xl font-bold text-white">You&apos;re All Set!</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Your booking has been confirmed and tickets are ready.
+      {/* Confirmation Banner */}
+      <div className="no-print text-center mb-6 space-y-1">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400 mb-2">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          <span>Payment Verified & Confirmed</span>
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          Your Admission Ticket
+        </h1>
+        <p className="text-xs text-muted-foreground">
+          Present the digital pass below at the cinema gate turnstile.
         </p>
       </div>
 
-      {/* Printable Ticket Card */}
-      <div className="ticket-card mt-8 overflow-hidden rounded-3xl border border-border bg-card shadow-2xl text-left">
-        {/* Ticket Header */}
-        <div className="bg-primary/10 border-b border-border/80 p-5 flex items-center justify-between print-badge">
-          <div>
-            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
-              E-Ticket (Verified)
+      {/* =========================================================================
+          AUTHENTIC CINEMA RECEIPT TICKET STUB (Inspired by Reference Design)
+         ========================================================================= */}
+      <div className="ticket-receipt-card relative w-full max-w-sm sm:max-w-md filter drop-shadow-2xl">
+        {/* Top Serrated / Saw-Tooth Perforated Cut */}
+        <SawtoothEdge isBottom={false} />
+
+        {/* Pure White Ticket Body */}
+        <div className="bg-white text-zinc-900 px-6 sm:px-8 py-6 select-none">
+          {/* Brand Header */}
+          <div className="text-center">
+            <p className="text-xs font-bold tracking-wider text-zinc-500 uppercase">
+              CinePath Multiplex <span className="text-primary font-extrabold">CINEMAS</span>
+            </p>
+            <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 mt-2">
+              Enjoy the Movie!
+            </h2>
+            <p className="text-[11px] sm:text-xs text-zinc-500 max-w-xs mx-auto mt-0.5 leading-relaxed">
+              Present this code at the gate scanner to access your screening
+            </p>
+          </div>
+
+          {/* Large High-Contrast Central QR Code */}
+          <div className="my-6 flex flex-col items-center justify-center">
+            <div className="p-3 bg-white border-2 border-zinc-900 rounded-2xl shadow-sm">
+              <QRCodeSVG
+                value={qrPayload}
+                size={180}
+                level="H"
+                fgColor="#09090b"
+                bgColor="#ffffff"
+              />
+            </div>
+            {/* Booking Reference Code */}
+            <span className="mt-3 font-mono text-sm sm:text-base font-extrabold tracking-widest text-zinc-900">
+              {booking.reference}
             </span>
-            <div className="text-sm font-semibold text-white">
-              Booking #{booking.reference}
-            </div>
-          </div>
-          <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Active
-          </span>
-        </div>
-
-        {/* QR Code Presentation */}
-        <div className="flex flex-col items-center justify-center bg-white p-6">
-          <div className="rounded-xl p-2 bg-white shadow-inner">
-            <QRCodeSVG value={qrPayload} size={180} level="H" />
-          </div>
-          <p className="mt-3 text-[11px] font-mono text-zinc-600">
-            Scan at {booking.hall} Entrance
-          </p>
-        </div>
-
-        {/* Perforated Divider */}
-        <div className="relative flex items-center justify-between border-t border-dashed border-border px-4 py-1 bg-card">
-          <div className="h-4 w-4 -ml-6 rounded-full bg-background border border-border" />
-          <div className="h-4 w-4 -mr-6 rounded-full bg-background border border-border" />
-        </div>
-
-        {/* Ticket Details */}
-        <div className="p-6 space-y-4">
-          <div>
-            <span className="text-xs font-medium text-muted-foreground">Film</span>
-            <h2 className="text-xl font-bold text-white">{booking.movieTitle}</h2>
-            <p className="text-xs text-primary font-medium">{booking.format}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 text-xs border-t border-border/60 pt-4">
-            <div>
-              <span className="text-muted-foreground flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" /> Date & Time
-              </span>
-              <p className="font-semibold text-white mt-1">{booking.time}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" /> Cinema & Hall
-              </span>
-              <p className="font-semibold text-white mt-1">{booking.cinema} · {booking.hall}</p>
-            </div>
+          {/* Perforated Center Tear Line with Side Notches */}
+          <div className="relative -mx-6 sm:-mx-8 my-5 flex items-center justify-between">
+            <div className="h-5 w-5 -ml-2.5 rounded-full bg-neutral-950 border border-zinc-300 print:bg-white" />
+            <div className="flex-1 border-t-2 border-dashed border-zinc-300" />
+            <div className="h-5 w-5 -mr-2.5 rounded-full bg-neutral-950 border border-zinc-300 print:bg-white" />
           </div>
 
-          {/* Reserved Seats List */}
-          <div className="border-t border-border/60 pt-4">
-            <span className="text-xs text-muted-foreground">Seats</span>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {booking.seats.map((seatStr, idx) => (
-                <span
-                  key={idx}
-                  className="rounded-lg bg-primary/20 px-3 py-1 text-xs font-bold text-primary border border-primary/30"
-                >
-                  {seatStr}
+          {/* Bottom Stub Section */}
+          <div className="flex items-stretch justify-between gap-3 pt-1">
+            {/* Left Column: Movie & Ticket Metadata */}
+            <div className="flex-1 space-y-3">
+              {/* Movie Header with Poster Thumbnail */}
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-xl overflow-hidden bg-zinc-200 border border-zinc-200 shrink-0 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={booking.posterUrl || "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg"}
+                    alt={booking.movieTitle}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 leading-tight">
+                    {booking.movieTitle}
+                  </h3>
+                  <p className="text-[11px] font-semibold text-primary mt-0.5">
+                    {booking.cinema} · {booking.hall}
+                  </p>
+                </div>
+              </div>
+
+              {/* Reserved Seats (No personal user name) */}
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Reserved Seats
                 </span>
-              ))}
+                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                  {booking.seatLabels.map((lbl) => (
+                    <span
+                      key={lbl}
+                      className="inline-block bg-zinc-100 border border-zinc-300 rounded px-2 py-0.5 text-xs font-bold text-zinc-900 font-mono"
+                    >
+                      Seat {lbl}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Format & Audio */}
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Format & Audio
+                </span>
+                <span className="text-xs font-semibold text-zinc-800">
+                  {booking.format}
+                </span>
+              </div>
+
+              {/* Session / Date & Time */}
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Session
+                </span>
+                <span className="text-xs font-semibold text-zinc-800">
+                  {booking.time}
+                </span>
+              </div>
+
+              {/* Total Paid */}
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Total Paid
+                </span>
+                <span className="text-xs font-extrabold text-zinc-900">
+                  {formatPrice(booking.totalAmount)} (Card Verified)
+                </span>
+              </div>
+            </div>
+
+            {/* Right Column: Rotated Reference & Mini Security QR */}
+            <div className="flex flex-col items-center justify-between pl-3 border-l border-zinc-200">
+              <span className="font-mono text-[10px] font-bold tracking-widest text-zinc-400 [writing-mode:vertical-rl] rotate-180 select-none">
+                {booking.reference}
+              </span>
+
+              {/* Mini Security QR Code */}
+              <div className="p-1.5 bg-white border border-zinc-300 rounded-lg shadow-sm">
+                <QRCodeSVG
+                  value={`CINEPATH-AUTH-${booking.reference}`}
+                  size={46}
+                  level="M"
+                  fgColor="#18181b"
+                  bgColor="#ffffff"
+                />
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Bottom Serrated / Saw-Tooth Perforated Cut */}
+        <SawtoothEdge isBottom={true} />
       </div>
 
-      {/* Action Buttons (Save as PDF / Add to Calendar) */}
-      <div className="no-print mt-6 flex flex-wrap justify-center gap-3">
+      {/* =========================================================================
+          ACTIONS: GOOGLE WALLET, DOWNLOAD PDF & CALENDAR
+         ========================================================================= */}
+      <div className="no-print mt-8 w-full max-w-sm sm:max-w-md space-y-3">
+        {/* Save to Google Wallet Button */}
         <button
-          onClick={handlePrint}
-          className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition"
+          type="button"
+          onClick={handleSaveToGoogleWallet}
+          className="w-full flex items-center justify-center gap-3 rounded-2xl bg-black px-6 py-3.5 text-sm font-semibold text-white border border-zinc-800 shadow-xl hover:bg-zinc-900 active:scale-98 transition cursor-pointer"
         >
-          <Download className="h-3.5 w-3.5" />
-          Save as PDF
+          {walletSaved ? (
+            <>
+              <Check className="h-5 w-5 text-emerald-400" />
+              <span className="text-emerald-400 font-bold">Added to Google Wallet!</span>
+            </>
+          ) : (
+            <>
+              {/* Google Wallet Icon */}
+              <svg className="h-5 w-5" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"
+                />
+              </svg>
+              <span>Save to Google Wallet</span>
+            </>
+          )}
         </button>
-        <button
-          onClick={handleAddToCalendar}
-          className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition"
-        >
-          <Calendar className="h-3.5 w-3.5" />
-          Add to Calendar
-        </button>
-      </div>
 
-      {/* Guest conversion banner */}
-      <div className="no-print mt-8 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-left">
-        <h3 className="text-xs font-bold text-white">Save your tickets for later?</h3>
-        <p className="text-[11px] text-muted-foreground mt-0.5">
-          Create a password to turn your booking into a permanent CinePath account.
-        </p>
-        <Link
-          href="/register"
-          className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-        >
-          Create account <ArrowRight className="h-3 w-3" />
-        </Link>
+        {/* Secondary Buttons: PDF Download & Calendar */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-card px-4 py-3 text-xs font-semibold text-white hover:bg-zinc-800/80 active:scale-95 transition cursor-pointer"
+          >
+            <Download className="h-4 w-4" />
+            <span>Download PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAddToCalendar}
+            className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-card px-4 py-3 text-xs font-semibold text-white hover:bg-zinc-800/80 active:scale-95 transition cursor-pointer"
+          >
+            <Calendar className="h-4 w-4" />
+            <span>Add to Calendar</span>
+          </button>
+        </div>
+
+        {/* Return to Home link */}
+        <div className="pt-2 text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white transition"
+          >
+            <span>Return to CinePath Home</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
     </div>
   );

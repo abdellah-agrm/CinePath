@@ -45,6 +45,7 @@ export async function GET(
     // 2. If showtime is not in DB, dynamically generate from TMDB movie slug
     if (!showtime) {
       let movieTitle = "Cinema Feature";
+      let moviePoster = "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg";
       let timeStr = "20:00";
       let hallName = "Hall 1 (IMAX)";
       let formatStr = "IMAX 2D";
@@ -59,6 +60,7 @@ export async function GET(
         const movie = await getMovieBySlug(slug);
         if (movie) {
           movieTitle = movie.title;
+          if (movie.posterUrl) moviePoster = movie.posterUrl;
         } else {
           movieTitle = slug
             .split("-")
@@ -119,6 +121,7 @@ export async function GET(
             basePrice,
             movieTitle,
             hallName,
+            posterUrl: moviePoster,
             totalRows: 6,
             totalCols: 10,
           },
@@ -167,6 +170,7 @@ export async function GET(
           basePrice: Number(showtime.basePrice),
           movieTitle: showtime.movie.title,
           hallName: showtime.hall.name,
+          posterUrl: showtime.movie.posterUrl,
           totalRows: showtime.hall.totalRows,
           totalCols: showtime.hall.totalCols,
         },
