@@ -3,7 +3,7 @@ import { ArrowLeft, Lock, Database, EyeOff } from "lucide-react";
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12 pb-24">
+    <div className="mx-auto max-w-4xl px-4 pt-28 sm:pt-36 pb-24">
       <Link
         href="/"
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white mb-6"

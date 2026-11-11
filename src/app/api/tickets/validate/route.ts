@@ -5,7 +5,7 @@ import { verifyTicketHmac } from "@/lib/hmac";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { qrData } = body;
+    const qrData = body.qrData || body.code;
 
     if (!qrData) {
       return NextResponse.json(

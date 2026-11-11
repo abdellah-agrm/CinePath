@@ -189,29 +189,26 @@ export default function TicketConfirmationPage() {
   });
 
   // Dedicated High-Definition Single-Page PDF Generator
+  // Draws authentic cinema receipt stub matching reference design (media_1794387023177_d74e8190.jpg)
   const handleDownloadPdf = async () => {
     try {
       setIsGeneratingPdf(true);
-      const ticketElement = document.getElementById("ticket-receipt-card");
-      if (!ticketElement) {
-        window.print();
-        return;
-      }
 
-      // Dynamically load html2canvas and jspdf client-side
-      const html2canvasModule = await import("html2canvas");
-      const html2canvas = html2canvasModule.default || html2canvasModule;
       const { jsPDF } = await import("jspdf");
+      const QRCodeModule = await import("qrcode");
+      const QRCode = QRCodeModule.default || QRCodeModule;
 
-      const canvas = await html2canvas(ticketElement, {
-        scale: 3, // 300 DPI high-definition capture
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: null, // preserve transparent serrated edges
-        logging: false,
+      const qrDataUrl = await QRCode.toDataURL(qrPayload, {
+        width: 600,
+        margin: 1,
+        errorCorrectionLevel: "H",
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const miniQrDataUrl = await QRCode.toDataURL(`CINEPATH-AUTH-${booking.reference}`, {
+        width: 200,
+        margin: 1,
+        errorCorrectionLevel: "M",
+      });
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -222,55 +219,152 @@ export default function TicketConfirmationPage() {
       const pageWidth = 210;
       const pageHeight = 297;
 
-      // Soft light clean paper background
-      pdf.setFillColor(245, 246, 248);
+      // Soft paper background
+      pdf.setFillColor(244, 245, 247);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
 
-      // Branded PDF Header
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(15);
-      pdf.setTextColor(15, 23, 42); // slate-900
-      pdf.text("CinePath Multiplex", pageWidth / 2, 20, { align: "center" });
+      // Receipt Card Geometry
+      const cardW = 105;
+      const cardH = 195;
+      const cardX = (pageWidth - cardW) / 2;
+      const cardY = 22;
 
+      // Draw White Card Body
+      pdf.setFillColor(255, 255, 255);
+      pdf.setDrawColor(220, 222, 228);
+      pdf.rect(cardX, cardY, cardW, cardH, "FD");
+
+      // Top Zigzag Saw-tooth edge
+      const toothWidth = 3.5;
+      const toothHeight = 2.5;
+      const teethCount = Math.floor(cardW / toothWidth);
+
+      pdf.setFillColor(244, 245, 247);
+      pdf.setDrawColor(244, 245, 247);
+      for (let i = 0; i < teethCount; i++) {
+        const x1 = cardX + i * toothWidth;
+        const x2 = x1 + toothWidth / 2;
+        const x3 = x1 + toothWidth;
+        pdf.triangle(x1, cardY, x2, cardY + toothHeight, x3, cardY, "FD");
+      }
+
+      // Header Brand
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(8);
       pdf.setTextColor(225, 29, 72); // rose-600
-      pdf.text("OFFICIAL CINEMA ADMISSION PASS", pageWidth / 2, 25, { align: "center" });
+      pdf.text("CINEPATH MULTIPLEX · BILLET OFFICIEL", pageWidth / 2, cardY + 12, { align: "center" });
 
-      // Calculate scaled ticket dimensions preserving proportions
-      const ticketWidthMm = 112;
-      const ticketHeightMm = (canvas.height * ticketWidthMm) / canvas.width;
-      const posX = (pageWidth - ticketWidthMm) / 2;
-      const posY = 32;
-
-      // Render crisp receipt card
-      pdf.addImage(imgData, "PNG", posX, posY, ticketWidthMm, ticketHeightMm, undefined, "FAST");
-
-      // Footer Instructions on PDF
-      const footerY = Math.min(posY + ticketHeightMm + 12, 280);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(71, 85, 105);
-      pdf.text(
-        "Please present the QR code above at the cinema turnstile scanner.",
-        pageWidth / 2,
-        footerY,
-        { align: "center" }
-      );
+      pdf.setFontSize(13);
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.text("Bonne séance !", pageWidth / 2, cardY + 18, { align: "center" });
 
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(7.5);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text("Présentez ce QR code à la borne de contrôle", pageWidth / 2, cardY + 23, { align: "center" });
+
+      // Central QR Code Box
+      const qrSize = 48;
+      const qrX = cardX + (cardW - qrSize) / 2;
+      const qrY = cardY + 28;
+
+      pdf.setDrawColor(203, 213, 225);
+      pdf.setFillColor(255, 255, 255);
+      pdf.roundedRect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4, 3, 3, "FD");
+      pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+
+      // Booking Reference
+      pdf.setFont("courier", "bold");
+      pdf.setFontSize(12);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(booking.reference, pageWidth / 2, qrY + qrSize + 8, { align: "center" });
+
+      // Perforation line with side notch circles
+      const tearY = qrY + qrSize + 14;
+      pdf.setFillColor(244, 245, 247);
+      pdf.setDrawColor(220, 222, 228);
+      pdf.circle(cardX, tearY, 3.5, "FD");
+      pdf.circle(cardX + cardW, tearY, 3.5, "FD");
+
+      pdf.setLineDashPattern([1.5, 1.5], 0);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.line(cardX + 4, tearY, cardX + cardW - 4, tearY);
+      pdf.setLineDashPattern([], 0); // reset dash
+
+      // Lower Section: Movie & Showtime Details
+      const detailsY = tearY + 8;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(booking.movieTitle, cardX + 8, detailsY);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(225, 29, 72);
+      pdf.text(`${booking.cinema} · ${booking.hall}`, cardX + 8, detailsY + 5);
+
+      // Metadata labels & values (NO personal user name)
+      const fields = [
+        { label: "SÉANCE / HORAIRE", val: `${booking.time} (${booking.format})` },
+        { label: "PLACES RÉSERVÉES", val: booking.seatLabels.map((s) => `Siège ${s}`).join(", ") },
+        { label: "MONTANT TOTAL", val: `${booking.totalAmount}.00 MAD (Payé · Carte vérifiée)` },
+        { label: "CONTRÔLE D'ACCÈS", val: "Billet valide · Entrée unique salle" },
+      ];
+
+      let currentY = detailsY + 14;
+      fields.forEach((f) => {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(148, 163, 184); // slate-400
+        pdf.text(f.label, cardX + 8, currentY);
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(30, 41, 59); // slate-800
+        pdf.text(f.val, cardX + 8, currentY + 4);
+
+        currentY += 10.5;
+      });
+
+      // Mini Security QR and Reference Code on the right
+      const miniQrSize = 18;
+      const miniQrX = cardX + cardW - miniQrSize - 8;
+      const miniQrY = detailsY + 12;
+
+      pdf.addImage(miniQrDataUrl, "PNG", miniQrX, miniQrY, miniQrSize, miniQrSize);
+
+      pdf.setFont("courier", "bold");
+      pdf.setFontSize(7);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text(booking.reference, miniQrX + miniQrSize / 2, miniQrY + miniQrSize + 4, {
+        align: "center",
+      });
+
+      // Bottom Zigzag Saw-tooth edge
+      pdf.setFillColor(244, 245, 247);
+      pdf.setDrawColor(244, 245, 247);
+      for (let i = 0; i < teethCount; i++) {
+        const x1 = cardX + i * toothWidth;
+        const x2 = x1 + toothWidth / 2;
+        const x3 = x1 + toothWidth;
+        pdf.triangle(x1, cardY + cardH, x2, cardY + cardH - toothHeight, x3, cardY + cardH, "FD");
+      }
+
+      // Page footer
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
       pdf.setTextColor(148, 163, 184);
       pdf.text(
-        `Booking Ref: ${booking.reference} · Verified Cryptographic HMAC Signature · CinePath Ticketing System`,
+        `Billet électronique officiel CinePath · Signature cryptographique HMAC SHA-256 vérifiée`,
         pageWidth / 2,
-        footerY + 5,
+        cardY + cardH + 10,
         { align: "center" }
       );
 
       pdf.save(`CinePath-Admission-Ticket-${booking.reference}.pdf`);
     } catch (err) {
-      console.error("PDF generator encountered an error, falling back to window.print():", err);
+      console.error("PDF generator error:", err);
       window.print();
     } finally {
       setIsGeneratingPdf(false);

@@ -2,16 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  Search,
-  LayoutGrid,
-  List,
-  Filter,
-  Calendar,
-  ChevronRight,
-  Loader2,
-} from "lucide-react";
-import { formatPrice } from "@/lib/utils";
+import { Search, SlidersHorizontal, Loader2, Film } from "lucide-react";
 
 interface MovieItem {
   id: string;
@@ -33,7 +24,6 @@ export default function MoviesCatalogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("ALL");
   const [selectedFormat, setSelectedFormat] = useState("ALL");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
     async function loadMovies() {
@@ -57,7 +47,7 @@ export default function MoviesCatalogPage() {
 
     const timer = setTimeout(() => {
       loadMovies();
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [searchQuery, selectedGenre]);
@@ -69,205 +59,153 @@ export default function MoviesCatalogPage() {
     return true;
   });
 
-  return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-24">
-      {/* Page Title & Search Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            Movies in Theatres
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Official catalog powered live by The Movie Database (TMDB) API
-          </p>
-        </div>
+  const getFrenchAgeLabel = (rating?: string) => {
+    if (!rating) return { circle: null, text: "Tout public" };
+    if (rating.includes("16")) return { circle: "16", text: "Interdit aux moins de 16 ans" };
+    if (rating.includes("12") || rating.includes("14")) {
+      return { circle: "12", text: "Interdit aux moins de 12 ans" };
+    }
+    return { circle: null, text: "Tout public" };
+  };
 
-        {/* Search Input & View Toggle */}
-        <div className="flex items-center gap-3">
-          <div className="relative w-full md:w-72">
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white pt-28 sm:pt-36 pb-20">
+      <div className="mx-auto max-w-[1400px] px-4 sm:px-8 lg:px-12">
+        {/* Page Header & Search Bar matching pathe.ma/fr */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8">
+          <div>
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+              Tous les films à l&apos;affiche
+            </h1>
+            <p className="text-xs sm:text-sm text-[#9ca3af] mt-1">
+              au Pathé Californie · Réservez vos places en IMAX, 4DX et Dolby Atmos
+            </p>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative w-full md:w-80">
             <input
               type="text"
-              placeholder="Search movies..."
+              placeholder="Rechercher un film, un genre..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-border bg-card px-4 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary pl-9"
+              className="w-full rounded-[8px] border border-white/10 bg-[#1a1a1a] pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-[#8c8c8c] focus:outline-none focus:border-[#ffc61a] transition-colors"
             />
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          </div>
-
-          <div className="flex rounded-xl border border-border bg-card p-1">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`rounded-lg p-1.5 transition ${
-                viewMode === "grid"
-                  ? "bg-primary text-white"
-                  : "text-muted-foreground hover:text-white"
-              }`}
-              title="Grid view"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`rounded-lg p-1.5 transition ${
-                viewMode === "list"
-                  ? "bg-primary text-white"
-                  : "text-muted-foreground hover:text-white"
-              }`}
-              title="List view"
-            >
-              <List className="h-4 w-4" />
-            </button>
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#8c8c8c]" />
           </div>
         </div>
-      </div>
 
-      {/* Filter Chips Bar */}
-      <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-border/60 pb-4 text-xs">
-        <span className="text-muted-foreground font-medium mr-2 flex items-center gap-1">
-          <Filter className="h-3.5 w-3.5" /> Genre:
-        </span>
-        {["ALL", "Action", "Adventure", "Science Fiction", "Drama", "Animation", "Comedy", "Horror", "Thriller"].map(
-          (genre) => (
+        {/* Filter Pills Strip */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-8 text-xs">
+          <div className="flex items-center gap-1.5 rounded-[6px] bg-[#2c2825] px-3.5 py-2 text-neutral-200 font-semibold shrink-0">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Filtres</span>
+          </div>
+
+          {[
+            { label: "Tous les films", value: "ALL" },
+            { label: "Action", value: "Action" },
+            { label: "Aventure", value: "Aventure" },
+            { label: "Science-Fiction", value: "Science-Fiction" },
+            { label: "Drame", value: "Drame" },
+            { label: "Animation", value: "Animation" },
+            { label: "Comédie", value: "Comédie" },
+            { label: "Epouvante - Horreur", value: "Epouvante - Horreur" },
+            { label: "Thriller", value: "Thriller" },
+          ].map((g) => (
             <button
-              key={genre}
-              onClick={() => setSelectedGenre(genre)}
-              className={`rounded-full px-3 py-1 font-semibold transition ${
-                selectedGenre === genre
-                  ? "bg-primary text-white shadow-sm"
-                  : "border border-border bg-card text-muted-foreground hover:text-white"
+              key={g.value}
+              type="button"
+              onClick={() => setSelectedGenre(g.value)}
+              className={`rounded-[6px] px-3.5 py-2 font-bold transition-colors shrink-0 cursor-pointer active:scale-[0.97] ${
+                selectedGenre === g.value
+                  ? "border border-white/80 bg-[#322e2a] text-white"
+                  : "bg-[#1a1a1a] hover:bg-[#252525] text-[#a3a3a3] hover:text-white"
               }`}
             >
-              {genre}
+              {g.label}
             </button>
-          )
-        )}
+          ))}
 
-        <div className="hidden sm:block h-4 w-[1px] bg-border mx-2" />
+          <div className="h-5 w-[1px] bg-white/10 mx-1 shrink-0" />
 
-        <span className="text-muted-foreground font-medium mr-2">Format:</span>
-        {["ALL", "IMAX", "2D"].map((fmt) => (
-          <button
-            key={fmt}
-            onClick={() => setSelectedFormat(fmt)}
-            className={`rounded-full px-3 py-1 font-semibold transition ${
-              selectedFormat === fmt
-                ? "bg-muted text-white border border-border"
-                : "border border-border/40 text-muted-foreground hover:text-white"
-            }`}
-          >
-            {fmt}
-          </button>
-        ))}
-      </div>
-
-      {/* Movie Results */}
-      {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center text-muted-foreground gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-xs">Fetching movies from TMDB API...</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="py-20 text-center">
-          <p className="text-base text-muted-foreground">
-            No movies found matching your filters.
-          </p>
-        </div>
-      ) : viewMode === "grid" ? (
-        /* Grid Mode */
-        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((movie) => (
-            <Link
-              key={movie.id}
-              href={`/movies/${movie.slug}`}
-              className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10"
+          {["ALL", "IMAX", "2D"].map((fmt) => (
+            <button
+              key={fmt}
+              type="button"
+              onClick={() => setSelectedFormat(fmt)}
+              className={`rounded-[6px] px-3.5 py-2 font-bold transition-colors shrink-0 cursor-pointer active:scale-[0.97] ${
+                selectedFormat === fmt
+                  ? "bg-[#ffc61a] text-[#0a0a0a]"
+                  : "bg-[#1a1a1a] hover:bg-[#252525] text-[#a3a3a3] hover:text-white"
+              }`}
             >
-              <div className="relative aspect-[2/3] w-full overflow-hidden bg-muted">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={movie.poster}
-                  alt={movie.title}
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                />
-                <div className="absolute top-2.5 right-2.5 rounded-full bg-background/80 backdrop-blur px-2 py-0.5 text-xs font-semibold text-amber-400">
-                  ⭐ {movie.rating}
-                </div>
-                <div className="absolute top-2.5 left-2.5 rounded-full bg-primary/90 backdrop-blur px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
-                  {movie.ageRating || "12+"}
-                </div>
-              </div>
-
-              <div className="flex flex-1 flex-col justify-between p-4">
-                <div>
-                  <h3 className="font-semibold text-white group-hover:text-primary transition line-clamp-1">
-                    {movie.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                    {movie.genres?.join(" · ")}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <Calendar className="h-3.5 w-3.5" /> {movie.duration} · {movie.language}
-                  </p>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
-                  <span className="text-xs font-semibold text-primary">
-                    From {formatPrice(movie.fromPrice)}
-                  </span>
-                  <span className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white group-hover:bg-primary/90 transition">
-                    Book
-                  </span>
-                </div>
-              </div>
-            </Link>
+              {fmt === "ALL" ? "Tous les formats" : fmt}
+            </button>
           ))}
         </div>
-      ) : (
-        /* List Mode */
-        <div className="mt-8 space-y-3">
-          {filtered.map((movie) => (
-            <Link
-              key={movie.id}
-              href={`/movies/${movie.slug}`}
-              className="group flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/50 hover:bg-card/80"
-            >
-              <div className="flex items-center gap-4">
-                <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={movie.poster}
-                    alt={movie.title}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-white group-hover:text-primary transition">
-                    {movie.title}
-                  </h3>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                    <span className="text-amber-400 font-semibold">
-                      ⭐ {movie.rating}
-                    </span>
-                    <span>·</span>
-                    <span>{movie.genres?.join(", ")}</span>
-                    <span>·</span>
-                    <span>{movie.duration}</span>
+
+        {/* Movies Poster Grid matching pathe_home.png poster style */}
+        {loading ? (
+          <div className="py-24 flex flex-col items-center justify-center text-[#8c8c8c] gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-[#ffc61a]" />
+            <p className="text-xs font-bold uppercase tracking-wider">
+              Chargement de la programmation Pathé...
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-24 text-center rounded-xl border border-white/[0.08] bg-[#141414] p-12">
+            <Film className="mx-auto h-10 w-10 text-neutral-600 mb-3" />
+            <p className="text-sm font-semibold text-neutral-300">
+              Aucun film ne correspond à votre recherche.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-x-4 gap-y-8">
+            {filtered.map((movie, idx) => {
+              const ageInfo = getFrenchAgeLabel(movie.ageRating);
+              return (
+                <Link
+                  key={movie.id}
+                  href={`/movies/${movie.slug}`}
+                  className="group block select-none cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                >
+                  <div className="relative aspect-[2/3] w-full overflow-hidden rounded-[4px] bg-[#161616] shadow-md">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={movie.poster}
+                      alt={movie.title}
+                      className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                      loading="lazy"
+                    />
+                    {idx < 5 && (
+                      <div className="absolute top-2 right-2 z-10">
+                        <span className="inline-block rounded-[3px] bg-[#e51923] px-2 py-0.5 text-[11px] font-bold text-white shadow-sm leading-tight">
+                          Nouveau
+                        </span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-semibold text-primary hidden sm:inline">
-                  From {formatPrice(movie.fromPrice)}
-                </span>
-                <span className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-white group-hover:bg-primary/90 transition">
-                  Showtimes
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+                  <div className="pt-2 space-y-0.5">
+                    <h3 className="text-[12.5px] font-medium text-white group-hover:text-[#ffc61a] transition-colors leading-snug line-clamp-2">
+                      {movie.title}
+                    </h3>
+                    <p className="text-[11.5px] text-[#8c8c8c] leading-snug flex items-center gap-1 truncate">
+                      {ageInfo.circle && (
+                        <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white/20 text-[8px] font-bold text-neutral-300 shrink-0">
+                          {ageInfo.circle}
+                        </span>
+                      )}
+                      <span className="truncate">{ageInfo.text}</span>
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

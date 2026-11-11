@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Film, Lock, Mail, Shield, Scan, User, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { Lock, Mail, Shield, Scan, User, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { useAuth, UserRole } from "@/context/auth-context";
 
 function LoginForm() {
@@ -18,9 +18,9 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(
     deniedReason === "admin_only"
-      ? "You need Administrator privileges to access that page."
+      ? "Accès réservé aux administrateurs."
       : deniedReason === "staff_only"
-      ? "You need Staff or Administrator privileges to access that page."
+      ? "Accès réservé au personnel habilité."
       : null
   );
   const [loading, setLoading] = useState(false);
@@ -36,10 +36,10 @@ function LoginForm() {
       if (res.success) {
         router.push(callbackUrl);
       } else {
-        setError(res.error || "Invalid email or password");
+        setError(res.error || "Identifiants incorrects");
       }
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred");
+      setError(err.message || "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
@@ -59,129 +59,118 @@ function LoginForm() {
           router.push(callbackUrl !== "/login" ? callbackUrl : "/");
         }
       } else {
-        setError("Failed to sign in with demo account.");
+        setError("Impossible de charger le compte démo.");
       }
     } catch (err: any) {
-      setError(err.message || "Demo login failed");
+      setError(err.message || "Erreur de connexion démo");
     } finally {
       setDemoLoading(null);
     }
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
-      {/* Background glow effects */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-
-      <div className="relative w-full max-w-md space-y-6">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 pt-28 sm:pt-36 pb-16 bg-[#0a0a0a] text-white">
+      <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 text-primary border border-primary/30 shadow-lg shadow-primary/20">
-            <Film className="h-6 w-6" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
-            Welcome to Cine<span className="text-primary">Path</span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            Mon compte Pathé
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to manage bookings, tickets, and access your role privileges.
+          <p className="text-xs sm:text-sm text-[#9ca3af] max-w-sm mx-auto">
+            Connectez-vous pour retrouver vos e-billets, votre Cinécarte et vos réservations.
           </p>
         </div>
 
         {/* Quick Role Switcher */}
-        <div className="rounded-2xl border border-border bg-card/60 p-4 backdrop-blur-sm shadow-xl space-y-3">
-          <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-            <span className="uppercase tracking-wider">⚡ Quick Role Switcher</span>
-            <span className="text-[10px] text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border">
-              Select Profile
+        <div className="rounded-xl border border-white/[0.08] bg-[#141414] p-4 space-y-3">
+          <div className="flex items-center justify-between text-xs font-bold text-neutral-300">
+            <span>Connexion rapide (Démo)</span>
+            <span className="text-[10px] text-[#9ca3af] bg-white/5 px-2 py-0.5 rounded">
+              1-Clic
             </span>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => handleQuickDemo("ADMIN")}
+              onClick={() => handleQuickDemo("CUSTOMER")}
               disabled={loading || !!demoLoading}
-              className="flex flex-col items-center justify-center gap-1 rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-center text-xs font-medium text-red-400 hover:bg-red-500/20 transition disabled:opacity-50"
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border border-[#ffc61a]/30 bg-[#ffc61a]/10 p-2.5 text-center text-xs font-bold text-[#ffc61a] hover:bg-[#ffc61a]/20 active:scale-[0.97] transition-all cursor-pointer"
             >
-              {demoLoading === "ADMIN" ? (
-                <Loader2 className="h-4 w-4 animate-spin text-red-400" />
+              {demoLoading === "CUSTOMER" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Shield className="h-4 w-4" />
+                <User className="h-4 w-4" />
               )}
-              <span className="font-semibold">Admin</span>
-              <span className="text-[9px] text-red-300/70">Full Access</span>
+              <span>Spectateur</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleQuickDemo("STAFF")}
               disabled={loading || !!demoLoading}
-              className="flex flex-col items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-center text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition disabled:opacity-50"
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border border-white/15 bg-white/5 p-2.5 text-center text-xs font-bold text-white hover:bg-white/10 active:scale-[0.97] transition-all cursor-pointer"
             >
               {demoLoading === "STAFF" ? (
-                <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Scan className="h-4 w-4" />
               )}
-              <span className="font-semibold">Staff</span>
-              <span className="text-[9px] text-amber-300/70">Gate Scanner</span>
+              <span>Contrôleur</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleQuickDemo("CUSTOMER")}
+              onClick={() => handleQuickDemo("ADMIN")}
               disabled={loading || !!demoLoading}
-              className="flex flex-col items-center justify-center gap-1 rounded-xl border border-primary/30 bg-primary/10 p-2.5 text-center text-xs font-medium text-primary hover:bg-primary/20 transition disabled:opacity-50"
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border border-white/15 bg-white/5 p-2.5 text-center text-xs font-bold text-white hover:bg-white/10 active:scale-[0.97] transition-all cursor-pointer"
             >
-              {demoLoading === "CUSTOMER" ? (
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              {demoLoading === "ADMIN" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <User className="h-4 w-4" />
+                <Shield className="h-4 w-4" />
               )}
-              <span className="font-semibold">Customer</span>
-              <span className="text-[9px] text-primary/70">User Portal</span>
+              <span>Admin</span>
             </button>
           </div>
         </div>
 
         {/* Standard Email/Password Login Form */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-xl space-y-4">
+        <div className="rounded-xl border border-white/[0.08] bg-[#141414] p-6 sm:p-8 space-y-4">
           {error && (
-            <div className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
+            <div className="flex items-center gap-2 rounded-lg bg-[#e51923]/15 border border-[#e51923]/30 p-3 text-xs text-rose-300">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Email Address</label>
+              <label className="text-xs font-bold text-neutral-300">Adresse e-mail</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-[#8c8c8c]" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full rounded-xl border border-border bg-background/50 pl-10 pr-4 py-2.5 text-sm text-white placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition"
+                  placeholder="abdellah.agrm@gmail.com"
+                  className="w-full rounded-[8px] border border-white/10 bg-[#0a0a0a] pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-[#737373] focus:border-[#ffc61a] focus:outline-none transition-colors"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Password</label>
-              </div>
+              <label className="text-xs font-bold text-neutral-300">Mot de passe</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-[#8c8c8c]" />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-border bg-background/50 pl-10 pr-4 py-2.5 text-sm text-white placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition"
+                  className="w-full rounded-[8px] border border-white/10 bg-[#0a0a0a] pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-[#737373] focus:border-[#ffc61a] focus:outline-none transition-colors"
                 />
               </div>
             </div>
@@ -189,26 +178,26 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading || !!demoLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/30 hover:bg-primary/90 transition disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-[8px] bg-[#ffc61a] hover:bg-[#ffd147] py-3.5 text-xs sm:text-sm font-bold text-[#0a0a0a] active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Signing In...</span>
+                  <span>Connexion en cours...</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In with Credentials</span>
+                  <span>Se connecter</span>
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="text-center pt-2 text-xs text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="font-semibold text-primary hover:underline">
-              Create an account
+          <div className="text-center pt-2 text-xs text-[#9ca3af]">
+            Pas encore de compte ?{" "}
+            <Link href="/register" className="font-bold text-[#ffc61a] hover:underline">
+              Créer un compte
             </Link>
           </div>
         </div>
@@ -221,8 +210,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+          <Loader2 className="h-8 w-8 animate-spin text-[#ffc61a]" />
         </div>
       }
     >
@@ -230,4 +219,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-

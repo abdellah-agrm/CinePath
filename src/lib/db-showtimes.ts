@@ -1,13 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { getMovieBySlug } from "@/lib/tmdb";
-import { redis } from "@/lib/redis";
 
 // UUID v4 regex
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Ensures that a showtime exists in the PostgreSQL database,
- * whether accessed via direct UUID or dynamic slug (e.g. "showtime-gladiator-ii-2").
+ * whether accessed via direct UUID or dynamic slug (e.g. "showtime-gladiator-ii-2", "session-la-legende-de-derry-2").
  * If PostgreSQL is down, this will throw an error to prevent silent offline failure.
  */
 export async function ensureShowtimeInDb(showtimeIdOrSlug: string) {
@@ -35,8 +34,8 @@ export async function ensureShowtimeInDb(showtimeIdOrSlug: string) {
     }
   }
 
-  // 2. Parse dynamic slug e.g. "showtime-gladiator-ii-2" or "dune-part-two"
-  let slug = showtimeIdOrSlug.replace(/^showtime-/, "");
+  // 2. Parse dynamic slug e.g. "showtime-gladiator-ii-2", "session-la-legende-de-derry-2" or "dune-part-two"
+  let slug = showtimeIdOrSlug.replace(/^(showtime|session)-/, "");
   let slot = "2"; // default slot 17:30
 
   const parts = slug.split("-");
@@ -47,47 +46,40 @@ export async function ensureShowtimeInDb(showtimeIdOrSlug: string) {
   }
 
   // 3. Find or sync movie from TMDB into PostgreSQL
-  let movie = await prisma.movie.findUnique({
-    where: { slug },
+  let movie = await prisma.movie.findFirst({
+    where: {
+      OR: [
+        { slug },
+        { slug: showtimeIdOrSlug },
+        { slug: showtimeIdOrSlug.replace(/^(showtime|session)-/, "") },
+      ],
+    },
   });
 
   if (!movie) {
     const tmdbMovie = await getMovieBySlug(slug);
-    if (tmdbMovie) {
-      movie = await prisma.movie.create({
-        data: {
-          title: tmdbMovie.title,
-          slug: tmdbMovie.slug,
-          synopsis: tmdbMovie.synopsis || "Now showing in CinePath Multiplex theatres.",
-          durationMin: tmdbMovie.durationMin || 120,
-          originalLanguage: tmdbMovie.originalLanguage || "en",
-          ageRating: tmdbMovie.ageRating || "12+",
-          releaseDate: tmdbMovie.releaseDate || new Date(),
-          posterUrl: tmdbMovie.posterUrl || "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-          status: "NOW_SHOWING",
-        },
-      });
-    } else {
-      // Fallback movie record with title casing
-      const formattedTitle = slug
-        .split("-")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ");
+    const targetSlug = tmdbMovie?.slug || slug;
 
-      movie = await prisma.movie.create({
-        data: {
-          title: formattedTitle,
-          slug,
-          synopsis: `Experience ${formattedTitle} in high-definition projection and immersive sound at CinePath.`,
-          durationMin: 120,
-          originalLanguage: "en",
-          ageRating: "12+",
-          releaseDate: new Date(),
-          posterUrl: "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-          status: "NOW_SHOWING",
-        },
-      });
-    }
+    const formattedTitle = (tmdbMovie?.title || targetSlug)
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+
+    movie = await prisma.movie.upsert({
+      where: { slug: targetSlug },
+      update: {},
+      create: {
+        title: tmdbMovie?.title || formattedTitle,
+        slug: targetSlug,
+        synopsis: tmdbMovie?.synopsis || `Experience ${formattedTitle} in high-definition projection and immersive sound at CinePath.`,
+        durationMin: tmdbMovie?.durationMin || 120,
+        originalLanguage: tmdbMovie?.originalLanguage || "en",
+        ageRating: tmdbMovie?.ageRating || "12+",
+        releaseDate: tmdbMovie?.releaseDate || new Date(),
+        posterUrl: tmdbMovie?.posterUrl || "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
+        status: "NOW_SHOWING",
+      },
+    });
   }
 
   // 4. Ensure Cinema and Hall exist
@@ -96,8 +88,10 @@ export async function ensureShowtimeInDb(showtimeIdOrSlug: string) {
   });
 
   if (!cinema) {
-    cinema = await prisma.cinema.create({
-      data: {
+    cinema = await prisma.cinema.upsert({
+      where: { slug: "cinepath-casablanca" },
+      update: {},
+      create: {
         name: "CinePath Anfa",
         slug: "cinepath-casablanca",
         city: "Casablanca",
@@ -174,14 +168,17 @@ export async function ensureShowtimeInDb(showtimeIdOrSlug: string) {
   const basePrice = slot === "1" ? 80.0 : slot === "2" ? 110.0 : 120.0;
   const format = slot === "1" ? "TWO_D" : "IMAX";
 
-  // Check if showtime already exists for this movie, hall, and time
+  // Check if showtime already exists for this movie, hall, and time (+/- 1 hour window)
+  const windowStart = new Date(startTime.getTime() - 60 * 60 * 1000);
+  const windowEnd = new Date(startTime.getTime() + 60 * 60 * 1000);
+
   let showtime = await prisma.showtime.findFirst({
     where: {
       movieId: movie.id,
       hallId: hall.id,
       startTime: {
-        gte: new Date(new Date(startTime).setHours(0, 0, 0, 0)),
-        lte: new Date(new Date(startTime).setHours(23, 59, 59, 999)),
+        gte: windowStart,
+        lte: windowEnd,
       },
     },
     include: {

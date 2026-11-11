@@ -9,7 +9,21 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "-apple-system", "sans-serif"],
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
+      },
       colors: {
+        brand: {
+          yellow: "#ffc61a",
+          yellowHover: "#ffd147",
+        },
+        amber: {
+          300: "#ffdd40",
+          400: "#ffc61a",
+          500: "#e5b600",
+          600: "#cc9e00",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -55,4 +69,3 @@ const config: Config = {
 };
 
 export default config;
-

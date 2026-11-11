@@ -1,14 +1,35 @@
 import type { Metadata } from "next";
+import { Plus_Jakarta_Sans, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
-import Link from "next/link";
-import { Film, Ticket, MapPin, User as UserIcon } from "lucide-react";
 import { PWARegister } from "@/components/pwa-register";
 import { AuthProvider } from "@/context/auth-context";
-import { Navbar } from "@/components/navbar";
+import { FloatingNavbar } from "@/components/cinema/floating-navbar";
+import { CinemaFooter } from "@/components/cinema-footer";
+import { MobileNav } from "@/components/mobile-nav";
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const barlowCondensed = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["600", "700", "800", "900"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "CinePath - Cinema Booking Platform",
-  description: "Browse movies, check showtimes, select seats in real-time, and book tickets.",
+  title: "Les Cinémas Pathé Maroc · Films, Séances & Réservation en ligne",
+  description:
+    "Consultez les films à l'affiche, les horaires des séances en IMAX, 4DX et Dolby Atmos, et réservez vos places en temps réel dans vos cinémas Pathé Maroc.",
+  icons: {
+    icon: "/logo/CinePath_Bear_Black_Icon.png",
+    shortcut: "/logo/CinePath_Bear_Black_Icon.png",
+    apple: "/logo/CinePath_Bear_Black_Icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -22,53 +43,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="flex min-h-screen flex-col bg-background text-foreground antialiased">
+    <html
+      lang="fr"
+      className={`dark ${plusJakartaSans.variable} ${barlowCondensed.variable}`}
+      suppressHydrationWarning
+    >
+      <body
+        className="flex min-h-screen flex-col bg-[#0a0a0a] font-sans text-white antialiased"
+        suppressHydrationWarning
+      >
         <AuthProvider>
-          {/* Navigation Bar with Auth State & Roles */}
-          <Navbar />
+          {/* Floating Transparent Navigation Bar */}
+          <FloatingNavbar />
 
           {/* Content */}
           <main className="flex-1">{children}</main>
 
-          {/* Desktop Footer */}
-          <footer className="no-print print:hidden border-t border-border bg-card/40 py-8 text-xs text-muted-foreground hidden md:block">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-white">CinePath</span>
-                <span>© {new Date().getFullYear()} All rights reserved.</span>
-              </div>
+          {/* Unified Cinema Footer */}
+          <CinemaFooter />
 
-              <div className="flex items-center gap-6">
-                <Link href="/terms" className="hover:text-white transition">
-                  Terms of Sale
-                </Link>
-                <Link href="/privacy" className="hover:text-white transition">
-                  Privacy Policy
-                </Link>
-              </div>
-            </div>
-          </footer>
-
-          {/* Mobile Bottom Navigation */}
-          <nav className="no-print print:hidden fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around border-t border-border bg-background/95 backdrop-blur md:hidden">
-            <Link href="/" className="flex flex-col items-center gap-1 text-xs text-primary">
-              <Film className="h-5 w-5" />
-              <span>Movies</span>
-            </Link>
-            <Link href="/cinemas" className="flex flex-col items-center gap-1 text-xs text-muted-foreground hover:text-white">
-              <MapPin className="h-5 w-5" />
-              <span>Cinemas</span>
-            </Link>
-            <Link href="/tickets" className="flex flex-col items-center gap-1 text-xs text-muted-foreground hover:text-white">
-              <Ticket className="h-5 w-5" />
-              <span>Tickets</span>
-            </Link>
-            <Link href="/login" className="flex flex-col items-center gap-1 text-xs text-muted-foreground hover:text-white">
-              <UserIcon className="h-5 w-5" />
-              <span>Account</span>
-            </Link>
-          </nav>
+          {/* Mobile Bottom Navigation (Hidden on /booking) */}
+          <MobileNav />
 
           {/* PWA Offline & Install Prompt */}
           <PWARegister />

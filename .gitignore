@@ -17,6 +17,7 @@
 # misc
 .DS_Store
 *.pem
+/certificates
 
 # debug
 npm-debug.log*
@@ -36,4 +37,8 @@ next-env.d.ts
 
 # prisma generated files
 /prisma/migrations
+
+# agents
+/.agents
+/screenshots
 

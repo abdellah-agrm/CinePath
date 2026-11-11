@@ -243,8 +243,13 @@ export function BookingStudio({ showtimeId }: BookingStudioProps) {
   const [cinecarteApplied, setCinecarteApplied] = useState(false);
 
   // Step 3 Checkout State (Sanitized: NO hardcoded personal name or personal email)
-  const [customerEmail, setCustomerEmail] = useState(user?.email || "");
-  const [customerName, setCustomerName] = useState(user?.fullName || "");
+  const [customerEmail, setCustomerEmail] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("cinepath_guest_email") || "";
+    }
+    return "";
+  });
+  const [customerName, setCustomerName] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -380,8 +385,8 @@ export function BookingStudio({ showtimeId }: BookingStudioProps) {
     }
 
     setSelectedSeats(newSelected);
-    // Reset tariffs to 0 so Step 2 initially shows "1 tarif restant à sélectionner" as in pathe_booking_04.png
-    setTariffs({ normal: 0, etudiant: 0 });
+    // Automatically pre-assign normal rate to selected seats so Step 2 "Continuer" is immediately ready
+    setTariffs({ normal: newSelected.length, etudiant: 0 });
   };
 
   const adjustTariff = (type: keyof TariffCount, delta: number) => {
@@ -440,6 +445,7 @@ export function BookingStudio({ showtimeId }: BookingStudioProps) {
 
       // Sync with localStorage for instant offline access
       try {
+        localStorage.setItem("cinepath_guest_email", customerEmail);
         localStorage.setItem(`cinepath_booking_${confirmedBooking.reference}`, JSON.stringify(confirmedBooking));
         const existing = localStorage.getItem("cinepath_user_tickets");
         const list = existing ? JSON.parse(existing) : [];
@@ -877,10 +883,10 @@ export function BookingStudio({ showtimeId }: BookingStudioProps) {
                                 disabled={seat.isBooked}
                                 onClick={() => handleSelectSeat(seat)}
                                 aria-label={`Siège ${seat.rowLabel}${seat.seatNumber}`}
-                                className={`flex items-center justify-center transition-transform duration-100 ${
+                                className={`p-0.5 sm:p-1 flex items-center justify-center transition-all duration-100 touch-manipulation select-none ${
                                   seat.isBooked
-                                    ? "cursor-not-allowed"
-                                    : "cursor-pointer active:scale-95"
+                                    ? "cursor-not-allowed opacity-40"
+                                    : "cursor-pointer active:scale-90 hover:scale-110"
                                 }`}
                               >
                                 {seat.type === "CHAISE_LONGUE" ? (
@@ -1206,14 +1212,58 @@ export function BookingStudio({ showtimeId }: BookingStudioProps) {
 
               {/* White Account & CGV Card (Matches pathe_booking_05.png 1:1) */}
               <div className="w-full max-w-[780px] rounded-xl bg-white border border-zinc-200/60 shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 sm:p-8 space-y-5">
-                <h3 className="text-base sm:text-lg font-black text-[#1c1e24]">
-                  Vous êtes connecté en tant que {customerName}
-                </h3>
+                {user ? (
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-[#1c1e24]">
+                      Vous êtes connecté en tant que {user.fullName || customerName || "Client CinePath"}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-zinc-600 mt-1">
+                      Vous recevrez vos e-billets à l&apos;adresse{" "}
+                      <span className="font-bold text-zinc-700">{user.email || customerEmail}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-[#1c1e24]">
+                        Coordonnées de réception de vos e-billets
+                      </h3>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        Aucun compte obligatoire. Vos e-billets officiels avec QR code d&apos;accès vous seront envoyés immédiatement.
+                      </p>
+                    </div>
 
-                <p className="text-xs sm:text-sm text-zinc-600">
-                  Vous recevrez vos e-billets à l&apos;adresse{" "}
-                  <span className="font-bold text-zinc-700">{customerEmail}</span>
-                </p>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-[#1c1e24] uppercase tracking-wide">
+                        Adresse email de réception *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={customerEmail}
+                        onChange={(e) => {
+                          setCustomerEmail(e.target.value);
+                          if (formError) setFormError(null);
+                        }}
+                        placeholder="votre.email@domaine.com"
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-[#1c1e24] placeholder:text-zinc-400 focus:outline-none focus:border-[#ffc61a] focus:ring-2 focus:ring-[#ffc61a]/20"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-[#1c1e24] uppercase tracking-wide">
+                        Nom complet (optionnel)
+                      </label>
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="ex. Client Pathé"
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-[#1c1e24] placeholder:text-zinc-400 focus:outline-none focus:border-[#ffc61a]"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Gray Terms Box */}
                 <div className="rounded-lg bg-[#f7f7f7] p-4">

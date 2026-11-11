@@ -6,6 +6,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:https": "next dev --experimental-https --experimental-https-key ./certificates/localhost-key.pem --experimental-https-cert ./certificates/localhost.pem",
+    "cert:generate": "node scripts/generate-cert.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -25,11 +27,13 @@
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "core-js": "^3.38.1",
     "date-fns": "^4.1.0",
     "html2canvas": "^1.4.1",
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^2.5.2",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.475.0",
     "next": "^15.1.7",
     "qrcode": "^1.5.4",
@@ -57,4 +61,3 @@
     "typescript": "^5.7.3"
   }
 }
-

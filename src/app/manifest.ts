@@ -8,10 +8,16 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "standalone",
     background_color: "#09090b",
-    theme_color: "#e11d48",
+    theme_color: "#feca00",
     orientation: "portrait",
     categories: ["entertainment", "tickets", "movies"],
     icons: [
+      {
+        src: "/logo/CinePath_Bear_Black_Icon.png",
+        sizes: "520x520",
+        type: "image/png",
+        purpose: "any",
+      },
       {
         src: "/icons/icon-192.png",
         sizes: "192x192",
