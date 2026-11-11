@@ -46,6 +46,33 @@ export default function AdminDashboardPage() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
+  // Live Backend Metrics State
+  const [metrics, setMetrics] = useState<{
+    totalRevenue: number;
+    occupancyRate: number;
+    ticketsSoldCount: number;
+    bookingsCount: number;
+    activeSeatLocks: number;
+    topMovies: any[];
+    showtimes: any[];
+  } | null>(null);
+
+  const fetchMetrics = async () => {
+    try {
+      const res = await fetch("/api/admin/metrics");
+      const data = await res.json();
+      if (data.success && data.data) {
+        setMetrics(data.data);
+      }
+    } catch (e) {
+      console.warn("Could not load metrics:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchMetrics();
+  }, []);
+
   const fetchUsers = async () => {
     setUsersLoading(true);
     try {
@@ -137,7 +164,7 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-24">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-28 sm:pt-36 pb-24">
       {/* Admin Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
@@ -214,37 +241,43 @@ export default function AdminDashboardPage() {
       {/* Tab 1: Overview */}
       {activeTab === "overview" && (
         <div className="mt-8 space-y-8">
-          {/* Key Metric KPI Cards */}
+          {/* Key Metric KPI Cards (Live from PostgreSQL & Redis) */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="rounded-2xl border border-border bg-card p-5">
               <span className="text-xs text-muted-foreground">Today&apos;s Revenue</span>
               <div className="mt-2 text-2xl font-extrabold text-white">
-                {formatPrice(34520)}
+                {formatPrice(metrics?.totalRevenue ?? 0)}
               </div>
               <div className="mt-2 flex items-center text-xs text-emerald-400 font-semibold gap-1">
-                <TrendingUp className="h-3.5 w-3.5" /> +18.4% vs last Tuesday
+                <TrendingUp className="h-3.5 w-3.5" /> Live PostgreSQL Succeeded Payments
               </div>
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-5">
               <span className="text-xs text-muted-foreground">Occupancy Rate</span>
-              <div className="mt-2 text-2xl font-extrabold text-white">78.5%</div>
+              <div className="mt-2 text-2xl font-extrabold text-white">
+                {metrics?.occupancyRate ?? 0}%
+              </div>
               <div className="mt-2 flex items-center text-xs text-emerald-400 font-semibold gap-1">
-                <TrendingUp className="h-3.5 w-3.5" /> 842 / 1072 seats sold
+                <TrendingUp className="h-3.5 w-3.5" /> {metrics?.ticketsSoldCount ?? 0} seats sold
               </div>
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-5">
               <span className="text-xs text-muted-foreground">Tickets Sold</span>
-              <div className="mt-2 text-2xl font-extrabold text-white">384</div>
-              <div className="mt-2 text-xs text-muted-foreground">Across 14 showtimes</div>
+              <div className="mt-2 text-2xl font-extrabold text-white">
+                {metrics?.ticketsSoldCount ?? 0}
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">Across verified screenings</div>
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-5">
               <span className="text-xs text-muted-foreground">Active Seat Locks</span>
-              <div className="mt-2 text-2xl font-extrabold text-amber-400">12</div>
+              <div className="mt-2 text-2xl font-extrabold text-amber-400">
+                {metrics?.activeSeatLocks ?? 0}
+              </div>
               <div className="mt-2 text-xs text-muted-foreground">
-                In checkout progress (Redis Lua)
+                Live Redis checkout holds
               </div>
             </div>
           </div>

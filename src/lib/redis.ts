@@ -42,7 +42,10 @@ export async function lockSeatsAtomically(
   ttlSeconds = 720
 ): Promise<boolean> {
   try {
-    const keys = seatIds.map((id) => `lock:${showtimeId}:${id}`);
+    const keys = seatIds.flatMap((id) => [
+      `lock:${showtimeId}:${id}`,
+      `seat_lock:${showtimeId}:${id}`,
+    ]);
     const timeoutPromise = new Promise<number>((_, reject) =>
       setTimeout(() => reject(new Error("Redis Lock Timeout")), 1500)
     );

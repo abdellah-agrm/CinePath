@@ -1,160 +1,85 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
-import { getMovieBySlug } from "@/lib/tmdb";
+import { ensureShowtimeInDb } from "@/lib/db-showtimes";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: showtimeId } = await params;
+    const { searchParams } = new URL(request.url);
+    const paramTime = searchParams.get("time");
+    const paramHall = searchParams.get("hall");
+    const paramFormat = searchParams.get("fmt");
 
-    let showtime: any = null;
-
-    // 1. Check if showtimeId exists in Prisma database
+    // 1. Ensure real Showtime, Hall, and Seats exist in PostgreSQL database
+    let showtime;
     try {
-      showtime = await Promise.race([
-        prisma.showtime.findUnique({
-          where: { id: showtimeId },
-          include: {
-            movie: true,
-            hall: {
-              include: {
-                seats: {
-                  orderBy: [{ gridRow: "asc" }, { gridCol: "asc" }],
-                },
-              },
-            },
-            tickets: {
-              where: {
-                status: { in: ["ACTIVE", "USED"] },
-              },
-              select: { seatId: true },
-            },
-          },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("DB Timeout")), 1200)
-        ),
-      ]);
-    } catch {
-      // Continue to dynamic TMDB showtime generator
-    }
-
-    // 2. If showtime is not in DB, dynamically generate from TMDB movie slug
-    if (!showtime) {
-      let movieTitle = "Cinema Feature";
-      let moviePoster = "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg";
-      let timeStr = "20:00";
-      let hallName = "Hall 1 (IMAX)";
-      let formatStr = "IMAX 2D";
-      let basePrice = 90;
-
-      // Extract movie slug from showtimeId e.g. "showtime-gladiator-ii-2"
-      if (showtimeId && showtimeId.startsWith("showtime-")) {
-        const parts = showtimeId.replace("showtime-", "").split("-");
-        const slot = parts.pop(); // last part is slot number (1, 2, or 3)
-        const slug = parts.join("-");
-
-        const movie = await getMovieBySlug(slug);
-        if (movie) {
-          movieTitle = movie.title;
-          if (movie.posterUrl) moviePoster = movie.posterUrl;
-        } else {
-          movieTitle = slug
-            .split("-")
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
-        }
-
-        if (slot === "1") {
-          timeStr = "14:30";
-          hallName = "Hall 2 (Standard)";
-          formatStr = "2D";
-          basePrice = 80;
-        } else if (slot === "2") {
-          timeStr = "17:30";
-          hallName = "Hall 1 (IMAX)";
-          formatStr = "IMAX 2D";
-          basePrice = 110;
-        } else {
-          timeStr = "20:00";
-          hallName = "Hall 1 (IMAX)";
-          formatStr = "IMAX 2D";
-          basePrice = 120;
-        }
-      }
-
-      // Generate 6 rows x 10 cols seat grid
-      const demoSeats = [];
-      const rows = ["A", "B", "C", "D", "E", "F"];
-      for (let r = 0; r < rows.length; r++) {
-        for (let c = 1; c <= 10; c++) {
-          const isAisle = c === 5;
-          const isVip = r >= 4;
-          // Sample a few booked seats for realism
-          const isBooked = !isAisle && (r === 2 && (c === 3 || c === 4)) || (r === 3 && c === 8);
-          demoSeats.push({
-            id: `seat-${rows[r]}-${c}`,
-            rowLabel: rows[r],
-            seatNumber: c,
-            gridRow: r + 1,
-            gridCol: c,
-            type: isVip ? "VIP" : "STANDARD",
-            status: isAisle ? "AISLE" : "ACTIVE",
-            priceModifier: isVip ? 30 : 0,
-            isBooked,
-            isLocked: false,
-          });
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          showtime: {
-            id: showtimeId,
-            startTime: `Today · ${timeStr}`,
-            format: formatStr,
-            audioLanguage: "VOSTFR",
-            basePrice,
-            movieTitle,
-            hallName,
-            posterUrl: moviePoster,
-            totalRows: 6,
-            totalCols: 10,
-          },
-          seats: demoSeats,
+      showtime = await ensureShowtimeInDb(showtimeId);
+    } catch (dbErr: any) {
+      console.error("[Seats API] Database connection error:", dbErr);
+      return NextResponse.json(
+        {
+          success: false,
+          code: "BACKEND_UNAVAILABLE",
+          message: "Cinema database is currently offline or unreachable. Cannot load verified seat map.",
         },
-      });
+        { status: 503 }
+      );
     }
 
-    const bookedSeatIds = new Set(showtime.tickets.map((t: any) => t.seatId));
+    if (!showtime) {
+      return NextResponse.json(
+        { success: false, message: "Showtime not found" },
+        { status: 404 }
+      );
+    }
 
-    // Check Redis active seat locks with safe try/catch
+    const bookedSeatIds = new Set(showtime.tickets?.map((t: any) => t.seatId) || []);
+
+    // 2. Query Redis for active seat locks using both UUID and label keys
     const lockedSeatIds = new Set<string>();
     try {
-      const seatKeys = showtime.hall.seats.map((s: any) => `lock:${showtimeId}:${s.id}`);
-      const lockedValues = seatKeys.length > 0 ? await redis.mget(seatKeys) : [];
-      showtime.hall.seats.forEach((seat: any, idx: number) => {
-        if (lockedValues[idx] !== null && lockedValues[idx] !== undefined) {
-          lockedSeatIds.add(seat.id);
-        }
-      });
-    } catch {
-      // Redis offline, proceed
+      if (showtime.hall?.seats?.length) {
+        const seatKeys = showtime.hall.seats.flatMap((s: any) => [
+          `lock:${showtime.id}:${s.id}`,
+          `lock:${showtimeId}:${s.id}`,
+          `seat_lock:${showtime.id}:${s.rowLabel}${s.seatNumber}`,
+          `seat_lock:${showtimeId}:${s.rowLabel}${s.seatNumber}`,
+        ]);
+        const lockedValues = await redis.mget(seatKeys);
+        showtime.hall.seats.forEach((seat: any, idx: number) => {
+          const baseIdx = idx * 4;
+          const isLocked = [0, 1, 2, 3].some(
+            (offset) => lockedValues[baseIdx + offset] !== null && lockedValues[baseIdx + offset] !== undefined
+          );
+          if (isLocked) {
+            lockedSeatIds.add(seat.id);
+          }
+        });
+      }
+    } catch (redisErr) {
+      console.warn("[Seats API] Redis offline or connection failed:", redisErr);
+      // Redis is optional for reading, but seat locking will be checked on checkout
     }
 
-    const seatsWithStatus = showtime.hall.seats.map((seat: any) => ({
+    const formattedTime =
+      paramTime ||
+      (typeof showtime.startTime === "string"
+        ? showtime.startTime
+        : `Today · ${new Date(showtime.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
+
+    const seatsWithStatus = (showtime.hall?.seats || []).map((seat: any) => ({
       id: seat.id,
+      label: `${seat.rowLabel}${seat.seatNumber}`,
       rowLabel: seat.rowLabel,
       seatNumber: seat.seatNumber,
       gridRow: seat.gridRow,
       gridCol: seat.gridCol,
       type: seat.type,
       status: seat.status,
-      priceModifier: Number(seat.priceModifier),
+      priceModifier: Number(seat.priceModifier || 0),
       isBooked: bookedSeatIds.has(seat.id),
       isLocked: lockedSeatIds.has(seat.id),
     }));
@@ -164,12 +89,15 @@ export async function GET(
       data: {
         showtime: {
           id: showtime.id,
-          startTime: typeof showtime.startTime === "string" ? showtime.startTime : new Date(showtime.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          format: showtime.format,
-          audioLanguage: showtime.audioLanguage,
+          originalId: showtimeId,
+          startTime: formattedTime,
+          format: paramFormat || showtime.format,
+          audioLanguage: showtime.audioLanguage || "VOSTFR",
           basePrice: Number(showtime.basePrice),
           movieTitle: showtime.movie.title,
-          hallName: showtime.hall.name,
+          movieSlug: showtime.movie.slug,
+          hallName: paramHall || showtime.hall.name,
+          cinemaName: showtime.hall.cinema?.name || "CinePath Anfa",
           posterUrl: showtime.movie.posterUrl,
           totalRows: showtime.hall.totalRows,
           totalCols: showtime.hall.totalCols,

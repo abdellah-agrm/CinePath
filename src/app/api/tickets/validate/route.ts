@@ -60,27 +60,12 @@ export async function POST(request: Request) {
     });
 
     if (!booking) {
-      // Return simulated success for demo bookings if database is not yet migrated
-      if (bookingRef && bookingRef.startsWith("CP-")) {
-        return NextResponse.json({
-          success: true,
-          code: "VALID",
-          message: "Admission Granted",
-          ticket: {
-            bookingRef,
-            movieTitle: "Dune: Part Two",
-            hallName: "Hall 1 (IMAX)",
-            time: "20:00",
-            seats: ["C9", "C10"],
-            format: "IMAX 2D",
-            status: "USED",
-            validatedAt: new Date().toLocaleTimeString(),
-          },
-        });
-      }
-
       return NextResponse.json(
-        { success: false, code: "NOT_FOUND", message: "Booking does not exist" },
+        {
+          success: false,
+          code: "NOT_FOUND",
+          message: "Booking does not exist in cinema database records. Access Denied.",
+        },
         { status: 404 }
       );
     }

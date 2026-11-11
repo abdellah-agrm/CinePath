@@ -73,7 +73,7 @@ export async function POST(
     }
 
     // 2. Atomically lock in Redis using Lua script (12 minutes TTL)
-    let lockAcquired = true;
+    let lockAcquired = false;
     try {
       lockAcquired = await lockSeatsAtomically(
         showtimeId,
@@ -81,15 +81,23 @@ export async function POST(
         lockToken,
         720 // 12 minutes in Redis (UI displays 10 minutes)
       );
-    } catch (redisError) {
-      console.warn("[Lock Seats API] Redis offline, using fallback lock:", redisError);
-      lockAcquired = true;
+    } catch (redisError: any) {
+      console.error("[Lock Seats API] Redis offline or connection failed:", redisError);
+      return NextResponse.json(
+        {
+          success: false,
+          code: "SEAT_LOCK_SERVICE_UNAVAILABLE",
+          message: "Real-time seat reservation service is currently offline. Please try again shortly.",
+        },
+        { status: 503 }
+      );
     }
 
     if (!lockAcquired) {
       return NextResponse.json(
         {
           success: false,
+          code: "LOCK_CONFLICT",
           message: "One or more selected seats are currently being held by someone else",
         },
         { status: 409 }

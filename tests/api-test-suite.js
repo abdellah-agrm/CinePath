@@ -253,9 +253,86 @@ async function runTestSuite() {
     );
   }
 
-  // TEST 13: Auth Logout (POST /api/auth/logout)
+  // TEST 13: Create Real Database Booking (POST /api/bookings)
+  let createdBookingRef = "";
+  let createdTicketQr = "";
   {
-    process.stdout.write("13. Testing POST /api/auth/logout ... ");
+    process.stdout.write("13. Testing POST /api/bookings (Real PostgreSQL & Redis) ... ");
+    const lockToken = "test_lock_" + Date.now();
+    const res = await request("/api/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        showtimeId: "showtime-gladiator-ii-2",
+        seats: ["A1", "A2"],
+        lockToken,
+        customerEmail: "qa_booking@cinepath.com",
+        customerName: "Alex Morgan",
+        totalAmount: 220,
+      }),
+    });
+    const passed = res.status === 200 && res.data?.success && Boolean(res.data?.booking?.reference);
+    if (passed) {
+      createdBookingRef = res.data.booking.reference;
+    }
+    results.push({ name: "POST /api/bookings", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Created Real DB Booking "${createdBookingRef}" with 2 seats in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.message || res.error})`
+    );
+  }
+
+  // TEST 14: Query Real Database Booking (GET /api/bookings/[id])
+  {
+    process.stdout.write("14. Testing GET /api/bookings/[id] ... ");
+    const res = await request(`/api/bookings/${createdBookingRef}`);
+    const passed = res.status === 200 && res.data?.success && res.data?.booking?.reference === createdBookingRef;
+    results.push({ name: "GET /api/bookings/[id]", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Retrieved DB Booking for "${res.data.booking.movieTitle}" in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.message || res.error})`
+    );
+  }
+
+  // TEST 15: Validate Real Database Booking at Turnstile (POST /api/tickets/validate)
+  {
+    process.stdout.write("15. Testing POST /api/tickets/validate (Real Database Verification) ... ");
+    const res = await request("/api/tickets/validate", {
+      method: "POST",
+      body: JSON.stringify({
+        qrData: JSON.stringify({
+          ref: createdBookingRef,
+          ticketId: "real-db-ticket",
+          showtimeId: "showtime-gladiator-ii-2",
+        }),
+      }),
+    });
+    const passed = res.status === 200 && res.data?.success && res.data?.code === "VALID";
+    results.push({ name: "POST /api/tickets/validate", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Admitted verified booking "${createdBookingRef}" in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.message || res.error})`
+    );
+  }
+
+  // TEST 16: Admin Live Metrics (GET /api/admin/metrics)
+  {
+    process.stdout.write("16. Testing GET /api/admin/metrics (PostgreSQL & Redis Live) ... ");
+    const res = await request("/api/admin/metrics");
+    const passed = res.status === 200 && res.data?.success && res.data?.data?.bookingsCount >= 1;
+    results.push({ name: "GET /api/admin/metrics", passed, ...res });
+    console.log(
+      passed
+        ? `✅ PASS (${res.status} - Live Revenue: ${res.data.data.totalRevenue} MAD, Bookings: ${res.data.data.bookingsCount} in ${res.duration}ms)`
+        : `❌ FAIL (${res.status} - ${res.data?.message || res.error})`
+    );
+  }
+
+  // TEST 17: Auth Logout (POST /api/auth/logout)
+  {
+    process.stdout.write("17. Testing POST /api/auth/logout ... ");
     const res = await request("/api/auth/logout", { method: "POST" });
     const passed = res.status === 200 && res.data?.success;
     results.push({ name: "POST /api/auth/logout", passed, ...res });
@@ -273,7 +350,7 @@ async function runTestSuite() {
   console.log("===============================================================");
 
   if (passedCount === results.length) {
-    console.log("🎉  ALL 13 BACKEND APIS & AUTH/RBAC ENDPOINTS ARE 100% HEALTHY!");
+    console.log("🎉  ALL " + results.length + " BACKEND APIS & AUTH/RBAC ENDPOINTS ARE 100% HEALTHY!");
   } else {
     process.exit(1);
   }
