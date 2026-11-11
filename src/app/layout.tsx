@@ -32,7 +32,7 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
 
           {/* Desktop Footer */}
-          <footer className="border-t border-border bg-card/40 py-8 text-xs text-muted-foreground hidden md:block">
+          <footer className="no-print print:hidden border-t border-border bg-card/40 py-8 text-xs text-muted-foreground hidden md:block">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-white">CinePath</span>
@@ -51,7 +51,7 @@ export default function RootLayout({
           </footer>
 
           {/* Mobile Bottom Navigation */}
-          <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around border-t border-border bg-background/95 backdrop-blur md:hidden">
+          <nav className="no-print print:hidden fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around border-t border-border bg-background/95 backdrop-blur md:hidden">
             <Link href="/" className="flex flex-col items-center gap-1 text-xs text-primary">
               <Film className="h-5 w-5" />
               <span>Movies</span>

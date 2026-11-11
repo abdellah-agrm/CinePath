@@ -51,14 +51,19 @@ export default function MovieDetailPage() {
   const [selectedFormat, setSelectedFormat] = useState("ALL");
   const [isLiked, setIsLiked] = useState(false);
 
-  // Generate the next 5 days
-  const days = [
-    { label: "Today", date: "10 Nov" },
-    { label: "Tomorrow", date: "11 Nov" },
-    { label: "Wed", date: "12 Nov" },
-    { label: "Thu", date: "13 Nov" },
-    { label: "Fri", date: "14 Nov" },
-  ];
+  // Generate the next 5 days dynamically
+  const days = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const label =
+      i === 0
+        ? "Today"
+        : i === 1
+        ? "Tomorrow"
+        : d.toLocaleDateString("en-US", { weekday: "short" });
+    const date = d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+    return { label, date };
+  });
 
   useEffect(() => {
     async function fetchMovieDetails() {

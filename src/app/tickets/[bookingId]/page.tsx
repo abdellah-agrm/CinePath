@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   Check,
   ExternalLink,
+  Printer,
+  Loader2,
 } from "lucide-react";
 import { generateTicketHmac } from "@/lib/hmac";
 import { formatPrice } from "@/lib/utils";
@@ -48,6 +50,7 @@ export default function TicketConfirmationPage() {
   });
 
   const [walletSaved, setWalletSaved] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   useEffect(() => {
     try {
@@ -77,6 +80,95 @@ export default function TicketConfirmationPage() {
     seats: booking.seatLabels,
     sig: generateTicketHmac(booking.id, "showtime-active", booking.reference),
   });
+
+  // Dedicated High-Definition Single-Page PDF Generator
+  const handleDownloadPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      const ticketElement = document.getElementById("ticket-receipt-card");
+      if (!ticketElement) {
+        window.print();
+        return;
+      }
+
+      // Dynamically load html2canvas and jspdf client-side
+      const html2canvasModule = await import("html2canvas");
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(ticketElement, {
+        scale: 3, // 300 DPI high-definition capture
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null, // preserve transparent serrated edges
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+
+      // Soft light clean paper background
+      pdf.setFillColor(245, 246, 248);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+      // Branded PDF Header
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(15);
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.text("CinePath Multiplex", pageWidth / 2, 20, { align: "center" });
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(225, 29, 72); // rose-600
+      pdf.text("OFFICIAL CINEMA ADMISSION PASS", pageWidth / 2, 25, { align: "center" });
+
+      // Calculate scaled ticket dimensions preserving proportions
+      const ticketWidthMm = 112;
+      const ticketHeightMm = (canvas.height * ticketWidthMm) / canvas.width;
+      const posX = (pageWidth - ticketWidthMm) / 2;
+      const posY = 32;
+
+      // Render crisp receipt card
+      pdf.addImage(imgData, "PNG", posX, posY, ticketWidthMm, ticketHeightMm, undefined, "FAST");
+
+      // Footer Instructions on PDF
+      const footerY = Math.min(posY + ticketHeightMm + 12, 280);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(
+        "Please present the QR code above at the cinema turnstile scanner.",
+        pageWidth / 2,
+        footerY,
+        { align: "center" }
+      );
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text(
+        `Booking Ref: ${booking.reference} · Verified Cryptographic HMAC Signature · CinePath Ticketing System`,
+        pageWidth / 2,
+        footerY + 5,
+        { align: "center" }
+      );
+
+      pdf.save(`CinePath-Admission-Ticket-${booking.reference}.pdf`);
+    } catch (err) {
+      console.error("PDF generator encountered an error, falling back to window.print():", err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   const handlePrint = () => {
     if (typeof window !== "undefined") {
@@ -176,32 +268,7 @@ export default function TicketConfirmationPage() {
   );
 
   return (
-    <div className="min-h-screen bg-neutral-950 py-12 px-4 flex flex-col items-center justify-center print:bg-white print:p-0">
-      {/* Strict Print CSS: isolates the white receipt ticket with saw-tooth edges on paper */}
-      <style jsx global>{`
-        @media print {
-          header,
-          nav,
-          footer,
-          .no-print,
-          button,
-          a {
-            display: none !important;
-          }
-          body {
-            background: #ffffff !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .ticket-receipt-card {
-            box-shadow: none !important;
-            margin: 0 auto !important;
-            max-width: 420px !important;
-            page-break-inside: avoid !important;
-          }
-        }
-      `}</style>
-
+    <div className="min-h-screen bg-neutral-950 py-12 px-4 flex flex-col items-center justify-center print:bg-white print:p-0 print:m-0">
       {/* Confirmation Banner */}
       <div className="no-print text-center mb-6 space-y-1">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400 mb-2">
@@ -219,7 +286,10 @@ export default function TicketConfirmationPage() {
       {/* =========================================================================
           AUTHENTIC CINEMA RECEIPT TICKET STUB (Inspired by Reference Design)
          ========================================================================= */}
-      <div className="ticket-receipt-card relative w-full max-w-sm sm:max-w-md filter drop-shadow-2xl">
+      <div
+        id="ticket-receipt-card"
+        className="ticket-receipt-card relative w-full max-w-sm sm:max-w-md filter drop-shadow-2xl print:drop-shadow-none"
+      >
         {/* Top Serrated / Saw-Tooth Perforated Cut */}
         <SawtoothEdge isBottom={false} />
 
@@ -273,6 +343,7 @@ export default function TicketConfirmationPage() {
                   <img
                     src={booking.posterUrl || "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg"}
                     alt={booking.movieTitle}
+                    crossOrigin="anonymous"
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -399,24 +470,46 @@ export default function TicketConfirmationPage() {
           )}
         </button>
 
-        {/* Secondary Buttons: PDF Download & Calendar */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Secondary Buttons: Direct PDF Download, Print & Calendar */}
+        <div className="grid grid-cols-3 gap-2.5">
+          <button
+            type="button"
+            disabled={isGeneratingPdf}
+            onClick={handleDownloadPdf}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-card px-3 py-3 text-xs font-semibold text-white hover:bg-zinc-800/80 active:scale-95 transition cursor-pointer disabled:opacity-50"
+            title="Download direct PDF file"
+          >
+            {isGeneratingPdf ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span>PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 text-primary" />
+                <span>PDF File</span>
+              </>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={handlePrint}
-            className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-card px-4 py-3 text-xs font-semibold text-white hover:bg-zinc-800/80 active:scale-95 transition cursor-pointer"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-card px-3 py-3 text-xs font-semibold text-white hover:bg-zinc-800/80 active:scale-95 transition cursor-pointer"
+            title="Print single-page receipt"
           >
-            <Download className="h-4 w-4" />
-            <span>Download PDF</span>
+            <Printer className="h-4 w-4" />
+            <span>Print</span>
           </button>
 
           <button
             type="button"
             onClick={handleAddToCalendar}
-            className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-card px-4 py-3 text-xs font-semibold text-white hover:bg-zinc-800/80 active:scale-95 transition cursor-pointer"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-card px-3 py-3 text-xs font-semibold text-white hover:bg-zinc-800/80 active:scale-95 transition cursor-pointer"
+            title="Add event to Calendar"
           >
             <Calendar className="h-4 w-4" />
-            <span>Add to Calendar</span>
+            <span>Calendar</span>
           </button>
         </div>
 
