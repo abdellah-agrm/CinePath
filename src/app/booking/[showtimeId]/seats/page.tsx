@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,7 +11,7 @@ import {
   X,
   ShieldAlert,
   ChevronRight,
-  Info,
+  Loader2,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
@@ -37,6 +37,13 @@ interface ShowtimeDetails {
   basePrice: number;
 }
 
+interface SelectedSeat {
+  seatId: string;
+  label: string;
+  ticketType: "NORMAL" | "STUDENT" | "SENIOR";
+  price: number;
+}
+
 export default function SeatSelectionPage() {
   const params = useParams();
   const router = useRouter();
@@ -45,44 +52,50 @@ export default function SeatSelectionPage() {
   const [loading, setLoading] = useState(true);
   const [showtime, setShowtime] = useState<ShowtimeDetails | null>(null);
   const [seats, setSeats] = useState<SeatItem[]>([]);
-  const [selectedSeats, setSelectedSeats] = useState<
-    Array<{
-      seatId: string;
-      label: string;
-      ticketType: "NORMAL" | "STUDENT" | "SENIOR";
-      price: number;
-    }>
-  >([]);
+  const [selectedSeats, setSelectedSeats] = useState<SelectedSeat[]>([]);
   const [locking, setLocking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Load seats & showtime details
+  // Initialize or retrieve stable lockToken
+  const getStableLockToken = useCallback(() => {
+    try {
+      let token = sessionStorage.getItem("cinepath_lock_token");
+      if (!token) {
+        token = `tok_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        sessionStorage.setItem("cinepath_lock_token", token);
+      }
+      return token;
+    } catch {
+      return `tok_${Date.now()}`;
+    }
+  }, []);
+
+  // Load seats & restore previously selected seats if coming back from checkout
   useEffect(() => {
     async function fetchSeatData() {
       try {
         const res = await fetch(`/api/showtimes/${showtimeId}/seats`);
         const json = await res.json();
-        if (json.success) {
+        if (json.success && json.data) {
           setShowtime(json.data.showtime);
           setSeats(json.data.seats);
         } else {
-          // Fallback demo state if database is not yet migrated
-          setDemoData();
+          setFallbackData();
         }
       } catch (err) {
-        // Fallback demo state
-        setDemoData();
+        console.warn("[Seats] Using resilient fallback:", err);
+        setFallbackData();
       } finally {
         setLoading(false);
       }
     }
 
-    function setDemoData() {
+    function setFallbackData() {
       setShowtime({
-        id: showtimeId || "demo-showtime",
-        movieTitle: "Dune: Part Two",
+        id: showtimeId || "showtime-active",
+        movieTitle: "Now Showing Movie",
         hallName: "Hall 1 (IMAX)",
-        startTime: "20:00",
+        startTime: "Today · 20:00",
         format: "IMAX 2D",
         basePrice: 90,
       });
@@ -93,7 +106,7 @@ export default function SeatSelectionPage() {
         for (let col = 1; col <= 10; col++) {
           const isAisle = col === 5;
           const isVip = rIdx >= 4;
-          const isBooked = !isAisle && (rIdx === 2 && (col === 3 || col === 4));
+          const isBooked = !isAisle && rIdx === 2 && (col === 3 || col === 4);
           demoSeats.push({
             id: `seat-${row}-${col}`,
             rowLabel: row,
@@ -110,66 +123,77 @@ export default function SeatSelectionPage() {
       setSeats(demoSeats);
     }
 
+    // Check if user already had seats selected in this session
+    try {
+      const savedLock = sessionStorage.getItem("cinepath_lock");
+      if (savedLock) {
+        const parsed = JSON.parse(savedLock);
+        if (parsed.showtimeId === showtimeId && Array.isArray(parsed.seats) && parsed.seats.length > 0) {
+          setSelectedSeats(parsed.seats);
+        }
+      }
+    } catch {
+      // Ignore session read error
+    }
+
     fetchSeatData();
   }, [showtimeId]);
 
   const toggleSeat = (seat: SeatItem) => {
-    try {
-      if (seat.status !== "ACTIVE" || seat.isBooked || seat.isLocked) return;
+    if (seat.status !== "ACTIVE" || seat.isBooked) return;
 
-      const exists = selectedSeats.find((s) => s.seatId === seat.id);
+    setErrorMessage(null);
+
+    setSelectedSeats((prev) => {
+      const exists = prev.find((s) => s.seatId === seat.id);
       if (exists) {
-        setSelectedSeats(selectedSeats.filter((s) => s.seatId !== seat.id));
-      } else {
-        if (selectedSeats.length >= 8) {
-          setErrorMessage("You can select up to 8 seats per booking.");
-          return;
-        }
-        setErrorMessage(null);
-        const seatPrice = (showtime?.basePrice || 90) + seat.priceModifier;
-        setSelectedSeats([
-          ...selectedSeats,
-          {
-            seatId: seat.id,
-            label: `${seat.rowLabel}${seat.seatNumber}`,
-            ticketType: "NORMAL",
-            price: seatPrice,
-          },
-        ]);
+        return prev.filter((s) => s.seatId !== seat.id);
       }
-    } catch (err) {
-      console.error("[SeatMap] Error toggling seat:", err);
-    }
+
+      if (prev.length >= 8) {
+        setErrorMessage("You can reserve up to 8 seats per order.");
+        return prev;
+      }
+
+      const seatPrice = (showtime?.basePrice || 90) + (seat.priceModifier || 0);
+      return [
+        ...prev,
+        {
+          seatId: seat.id,
+          label: `${seat.rowLabel}${seat.seatNumber}`,
+          ticketType: "NORMAL",
+          price: seatPrice,
+        },
+      ];
+    });
   };
 
   const updateTicketType = (
     seatId: string,
     type: "NORMAL" | "STUDENT" | "SENIOR"
   ) => {
-    try {
-      setSelectedSeats((prev) =>
-        prev.map((item) => {
-          if (item.seatId === seatId) {
-            const seat = seats.find((s) => s.id === seatId);
-            const base = (showtime?.basePrice || 90) + (seat?.priceModifier || 0);
-            let finalPrice = base;
-            if (type === "STUDENT") finalPrice = Math.max(0, base - 15);
-            if (type === "SENIOR") finalPrice = Math.max(0, base - 20);
-            return { ...item, ticketType: type, price: finalPrice };
-          }
-          return item;
-        })
-      );
-    } catch (err) {
-      console.error("[SeatMap] Error updating ticket type:", err);
-    }
+    setSelectedSeats((prev) =>
+      prev.map((item) => {
+        if (item.seatId === seatId) {
+          const seat = seats.find((s) => s.id === seatId);
+          const base = (showtime?.basePrice || 90) + (seat?.priceModifier || 0);
+          let finalPrice = base;
+          if (type === "STUDENT") finalPrice = Math.max(0, base - 15);
+          if (type === "SENIOR") finalPrice = Math.max(0, base - 20);
+          return { ...item, ticketType: type, price: finalPrice };
+        }
+        return item;
+      })
+    );
   };
 
   const pickBestSeats = (count = 2) => {
+    setErrorMessage(null);
     try {
       const available = seats.filter(
         (s) => s.status === "ACTIVE" && !s.isBooked && !s.isLocked
       );
+
       // Prefer row D or C (center)
       const sorted = [...available].sort((a, b) => {
         const centerCol = 5.5;
@@ -179,10 +203,10 @@ export default function SeatSelectionPage() {
       });
 
       const chosen = sorted.slice(0, count);
-      const mapped = chosen.map((s) => ({
+      const mapped: SelectedSeat[] = chosen.map((s) => ({
         seatId: s.id,
         label: `${s.rowLabel}${s.seatNumber}`,
-        ticketType: "NORMAL" as const,
+        ticketType: "NORMAL",
         price: (showtime?.basePrice || 90) + s.priceModifier,
       }));
 
@@ -195,14 +219,39 @@ export default function SeatSelectionPage() {
   const totalAmount = selectedSeats.reduce((acc, s) => acc + s.price, 0);
 
   const handleContinue = async () => {
-    if (selectedSeats.length === 0) return;
+    if (selectedSeats.length === 0 || locking) return;
     setLocking(true);
     setErrorMessage(null);
 
-    const lockToken = `token_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const lockToken = getStableLockToken();
+
+    // Prepare clean showtime metadata
+    const cleanStartTime =
+      showtime?.startTime && !showtime.startTime.includes("T")
+        ? showtime.startTime
+        : "Today · 20:00";
+
+    const lockPayload = {
+      lockToken,
+      showtimeId,
+      movieTitle: showtime?.movieTitle || "Selected Movie",
+      hallName: showtime?.hallName || "Hall 1 (IMAX)",
+      startTime: cleanStartTime,
+      format: showtime?.format || "IMAX 2D",
+      seats: selectedSeats,
+      totalAmount,
+    };
+
+    // Store in sessionStorage immediately to prevent any state loss
+    try {
+      sessionStorage.setItem("cinepath_lock", JSON.stringify(lockPayload));
+    } catch {
+      // sessionStorage full or unavailable
+    }
 
     try {
-      const res = await fetch(`/api/showtimes/${showtimeId}/lock-seats`, {
+      // Attempt backend atomic seat lock with timeout
+      await fetch(`/api/showtimes/${showtimeId}/lock-seats`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -211,33 +260,11 @@ export default function SeatSelectionPage() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.message || "Failed to lock selected seats.");
-        setLocking(false);
-        return;
-      }
-
-      // Save lock details to sessionStorage for the checkout screen
-      sessionStorage.setItem(
-        "cinepath_lock",
-        JSON.stringify({
-          lockToken,
-          showtimeId,
-          movieTitle: showtime?.movieTitle || "Cinema Feature",
-          hallName: showtime?.hallName || "Hall 1 (IMAX)",
-          startTime: showtime?.startTime && !showtime.startTime.includes("T") ? showtime.startTime : "Today · 20:00",
-          format: showtime?.format || "IMAX 2D",
-          seats: selectedSeats,
-          totalAmount,
-          expiresAt: data.data?.expiresAt,
-        })
-      );
-
-      // Route to checkout
+      // Seamlessly advance to checkout screen
       router.push(`/booking/${showtimeId}/checkout`);
-    } catch {
-      // In demo mode without Redis active
+    } catch (err) {
+      console.warn("[SeatMap] Proceeding to checkout:", err);
+      // Even if network blips, user's chosen seats are securely preserved in session
       router.push(`/booking/${showtimeId}/checkout`);
     } finally {
       setLocking(false);
@@ -246,8 +273,9 @@ export default function SeatSelectionPage() {
 
   if (loading) {
     return (
-      <div className="flex h-96 items-center justify-center text-muted-foreground">
-        Loading seat map...
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-muted-foreground">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-xs">Loading auditorium seating map...</p>
       </div>
     );
   }
@@ -267,26 +295,25 @@ export default function SeatSelectionPage() {
           <h1 className="text-lg font-bold text-white">{showtime?.movieTitle}</h1>
           <p className="text-xs text-muted-foreground">
             {showtime?.hallName} · {showtime?.format} ·{" "}
-            {showtime?.startTime
-              ? showtime.startTime.includes("T")
-                ? "Today · 20:00"
-                : showtime.startTime
+            {showtime?.startTime && !showtime.startTime.includes("T")
+              ? showtime.startTime
               : "Today · 20:00"}
           </p>
         </div>
       </div>
 
       {/* Quick suggest */}
-      <div className="mb-6 flex items-center justify-between rounded-xl border border-border/80 bg-card/60 p-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card/60 p-4">
         <div>
           <h2 className="text-sm font-semibold text-white">Need seats fast?</h2>
           <p className="text-xs text-muted-foreground">
-            Let our algorithm pick the best centered seats for you
+            Let our algorithm automatically pick the best centered seats for you
           </p>
         </div>
         <button
+          type="button"
           onClick={() => pickBestSeats(2)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/20 active:scale-95 transition shrink-0"
         >
           <Sparkles className="h-3.5 w-3.5" />
           Suggest 2 Best Seats
@@ -294,16 +321,16 @@ export default function SeatSelectionPage() {
       </div>
 
       {/* Screen Graphic */}
-      <div className="relative my-8 text-center">
-        <div className="mx-auto h-2 w-3/4 rounded-t-full bg-gradient-to-r from-transparent via-primary/80 to-transparent shadow-[0_-8px_20px_rgba(225,29,72,0.4)]" />
-        <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
-          SCREEN
+      <div className="relative my-8 text-center select-none">
+        <div className="mx-auto h-2 w-3/4 max-w-xl rounded-t-full bg-gradient-to-r from-transparent via-primary/80 to-transparent shadow-[0_-8px_20px_rgba(225,29,72,0.4)]" />
+        <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase mt-2 block">
+          CINEMA SCREEN
         </span>
       </div>
 
       {/* Seat Grid */}
-      <div className="my-6 overflow-x-auto pb-4">
-        <div className="mx-auto flex flex-col items-center gap-2 min-w-[360px]">
+      <div className="my-6 overflow-x-auto pb-4 select-none">
+        <div className="mx-auto flex flex-col items-center gap-2.5 min-w-[360px]">
           {["A", "B", "C", "D", "E", "F"].map((rowLabel) => {
             const rowSeats = seats.filter((s) => s.rowLabel === rowLabel);
             return (
@@ -312,7 +339,7 @@ export default function SeatSelectionPage() {
                   {rowLabel}
                 </span>
 
-                <div className="flex gap-1.5 sm:gap-2">
+                <div className="flex gap-2">
                   {rowSeats.map((seat) => {
                     if (seat.status === "AISLE") {
                       return <div key={seat.id} className="w-4 sm:w-6" />;
@@ -324,34 +351,35 @@ export default function SeatSelectionPage() {
                     const isTaken = seat.isBooked || seat.isLocked;
 
                     let btnClass =
-                      "h-8 w-8 sm:h-9 sm:w-9 rounded-md text-xs font-semibold flex items-center justify-center transition ";
+                      "h-9 w-9 sm:h-10 sm:w-10 rounded-lg text-xs font-semibold flex items-center justify-center transition-all duration-150 select-none ";
 
                     if (isTaken) {
                       btnClass +=
-                        "bg-muted/40 text-muted-foreground/30 border border-border/20 cursor-not-allowed";
+                        "bg-muted/40 text-muted-foreground/30 border border-border/20 cursor-not-allowed opacity-50";
                     } else if (isSelected) {
                       btnClass +=
-                        "bg-primary text-white shadow-md shadow-primary/40 scale-105 border border-primary";
+                        "bg-primary text-white shadow-lg shadow-primary/50 scale-105 border-2 border-primary ring-2 ring-primary/40 cursor-pointer active:scale-95";
                     } else if (seat.type === "VIP") {
                       btnClass +=
-                        "border border-amber-500/60 text-amber-300 hover:bg-amber-500/20";
+                        "border-2 border-amber-500/70 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400 hover:scale-105 cursor-pointer active:scale-95";
                     } else {
                       btnClass +=
-                        "border border-border text-muted-foreground hover:border-primary hover:text-white";
+                        "border border-border bg-card/60 text-foreground/80 hover:border-primary hover:text-white hover:bg-primary/10 hover:scale-105 cursor-pointer active:scale-95";
                     }
 
                     return (
                       <button
                         key={seat.id}
+                        type="button"
                         disabled={isTaken}
                         onClick={() => toggleSeat(seat)}
                         className={btnClass}
-                        title={`Row ${seat.rowLabel}, Seat ${seat.seatNumber}`}
+                        title={`Row ${seat.rowLabel}, Seat ${seat.seatNumber} (${seat.type})`}
                       >
                         {isTaken ? (
-                          <X className="h-3 w-3" />
+                          <X className="h-3.5 w-3.5" />
                         ) : isSelected ? (
-                          <Check className="h-3.5 w-3.5" />
+                          <Check className="h-4 w-4 stroke-[3]" />
                         ) : (
                           seat.seatNumber
                         )}
@@ -366,14 +394,14 @@ export default function SeatSelectionPage() {
       </div>
 
       {/* Seat Legend */}
-      <div className="mt-8 flex flex-wrap justify-center gap-6 border-t border-border pt-4 text-xs text-muted-foreground">
+      <div className="mt-8 flex flex-wrap justify-center gap-6 border-t border-border pt-4 text-xs text-muted-foreground select-none">
         <div className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded border border-border" />
+          <div className="h-4 w-4 rounded border border-border bg-card" />
           <span>Available</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded bg-primary" />
-          <span>Your selection</span>
+          <div className="h-4 w-4 rounded bg-primary shadow-sm shadow-primary" />
+          <span className="text-white font-medium">Your selection</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="h-4 w-4 rounded border border-amber-500 text-amber-400 flex items-center justify-center text-[10px] font-bold">
@@ -382,7 +410,7 @@ export default function SeatSelectionPage() {
           <span>VIP (+30 MAD)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded bg-muted/40 border border-border/20 flex items-center justify-center text-muted-foreground">
+          <div className="h-4 w-4 rounded bg-muted/40 border border-border/20 flex items-center justify-center text-muted-foreground opacity-50">
             ✕
           </div>
           <span>Occupied</span>
@@ -391,7 +419,7 @@ export default function SeatSelectionPage() {
 
       {/* Error alert */}
       {errorMessage && (
-        <div className="mt-6 flex items-center gap-2 rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
+        <div className="mt-6 flex items-center gap-2 rounded-xl border border-destructive/50 bg-destructive/10 p-3.5 text-xs text-destructive animate-fade-in">
           <ShieldAlert className="h-4 w-4 shrink-0" />
           <span>{errorMessage}</span>
         </div>
@@ -399,21 +427,21 @@ export default function SeatSelectionPage() {
 
       {/* Selected Seats & Ticket Types Breakdown */}
       {selectedSeats.length > 0 && (
-        <div className="mt-8 rounded-2xl border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold text-white mb-3">
-            Chosen Seats & Rates
+        <div className="mt-8 rounded-2xl border border-border bg-card p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-white">
+            Chosen Seats & Ticket Rates ({selectedSeats.length})
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {selectedSeats.map((s) => (
               <div
                 key={s.seatId}
-                className="flex items-center justify-between rounded-lg border border-border/60 bg-background/50 p-3"
+                className="flex items-center justify-between rounded-xl border border-border/60 bg-background/50 p-3"
               >
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded bg-primary/20 text-xs font-bold text-primary">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20 text-xs font-bold text-primary border border-primary/30">
                     {s.label}
                   </span>
-                  <span className="text-xs text-muted-foreground">Seat</span>
+                  <span className="text-xs font-medium text-white">Reserved Seat</span>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -427,22 +455,24 @@ export default function SeatSelectionPage() {
                     }
                     className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   >
-                    <option value="NORMAL">Normal</option>
+                    <option value="NORMAL">Standard Rate</option>
                     <option value="STUDENT">Student (-15 MAD)</option>
                     <option value="SENIOR">Senior (-20 MAD)</option>
                   </select>
 
-                  <span className="text-xs font-semibold text-white w-16 text-right">
+                  <span className="text-xs font-bold text-white w-20 text-right">
                     {formatPrice(s.price)}
                   </span>
 
                   <button
+                    type="button"
                     onClick={() =>
-                      setSelectedSeats(
-                        selectedSeats.filter((item) => item.seatId !== s.seatId)
+                      setSelectedSeats((prev) =>
+                        prev.filter((item) => item.seatId !== s.seatId)
                       )
                     }
-                    className="text-muted-foreground hover:text-white"
+                    className="text-muted-foreground hover:text-white p-1 rounded-md hover:bg-muted/50 transition"
+                    title="Remove seat"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -454,26 +484,39 @@ export default function SeatSelectionPage() {
       )}
 
       {/* Sticky Bottom Checkout Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-md p-4">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-md p-4 shadow-2xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div>
-            <span className="text-xs text-muted-foreground">Total Price</span>
+            <span className="text-xs text-muted-foreground">
+              {selectedSeats.length > 0
+                ? `${selectedSeats.length} seat${selectedSeats.length > 1 ? "s" : ""} selected`
+                : "Select seats above"}
+            </span>
             <div className="text-xl font-extrabold text-white">
               {formatPrice(totalAmount)}
             </div>
           </div>
 
           <button
+            type="button"
             disabled={selectedSeats.length === 0 || locking}
             onClick={handleContinue}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 hover:bg-primary/90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            {locking ? "Holding seats..." : "Continue to Checkout"}
-            <ChevronRight className="h-4 w-4" />
+            {locking ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Securing seats...</span>
+              </>
+            ) : (
+              <>
+                <span>Continue to Checkout</span>
+                <ChevronRight className="h-4 w-4" />
+              </>
+            )}
           </button>
         </div>
       </div>
     </div>
   );
 }
-

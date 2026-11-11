@@ -18,10 +18,11 @@ export const redis =
 
 if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis;
 
-// Atomic multi-seat locking script (Section 8.3 of Architecture Plan)
+// Atomic multi-seat locking script with owner-reentry support
 const LOCK_SEATS_LUA = `
 for i, key in ipairs(KEYS) do
-  if redis.call("EXISTS", key) == 1 then
+  local currentOwner = redis.call("GET", key)
+  if currentOwner and currentOwner ~= ARGV[1] then
     return 0
   end
 end

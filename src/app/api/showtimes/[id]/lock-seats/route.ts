@@ -32,27 +32,40 @@ export async function POST(
 
     // 1. Verify showtime & sold seats in DB with try/catch resilience
     try {
-      const showtime = await prisma.showtime.findUnique({
-        where: { id: showtimeId },
-      });
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          showtimeId
+        );
 
-      if (showtime) {
-        const alreadySoldTickets = await prisma.ticket.findMany({
-          where: {
-            showtimeId,
-            seatId: { in: seatIds },
-            status: { in: ["ACTIVE", "USED"] },
-          },
-        });
+      if (isUuid) {
+        const showtime = await Promise.race([
+          prisma.showtime.findUnique({
+            where: { id: showtimeId },
+          }),
+          new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), 800)
+          ),
+        ]);
 
-        if (alreadySoldTickets.length > 0) {
-          return NextResponse.json(
-            {
-              success: false,
-              message: "One or more seats have already been booked by another customer",
+        if (showtime) {
+          const alreadySoldTickets = await prisma.ticket.findMany({
+            where: {
+              showtimeId,
+              seatId: { in: seatIds },
+              status: { in: ["ACTIVE", "USED"] },
             },
-            { status: 409 }
-          );
+          });
+
+          if (alreadySoldTickets.length > 0) {
+            return NextResponse.json(
+              {
+                success: false,
+                message:
+                  "One or more seats have already been booked by another customer",
+              },
+              { status: 409 }
+            );
+          }
         }
       }
     } catch (dbError) {
