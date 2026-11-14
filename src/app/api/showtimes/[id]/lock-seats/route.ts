@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { lockSeatsAtomically } from "@/lib/redis";
 import { lockSeatsSchema } from "@/lib/validations";
+import { ensureShowtimeInDb } from "@/lib/db-showtimes";
 
 export async function POST(
   request: Request,
@@ -30,46 +31,60 @@ export async function POST(
 
     const { seatIds, lockToken } = parseResult.data;
 
-    // 1. Verify showtime & sold seats in DB with try/catch resilience
+    // 1. Verify showtime & sold / broken seats in DB
     try {
-      const isUuid =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          showtimeId
+      const showtime = await ensureShowtimeInDb(showtimeId);
+
+      if (showtime) {
+        const cleanRequestedLabels = seatIds.map((s: string) =>
+          s.replace(/^Fauteuil\s+/i, "").replace(/^Seat\s+/i, "").trim().toUpperCase()
         );
 
-      if (isUuid) {
-        const showtime = await Promise.race([
-          prisma.showtime.findUnique({
-            where: { id: showtimeId },
-          }),
-          new Promise<null>((_, reject) =>
-            setTimeout(() => reject(new Error("Timeout")), 800)
-          ),
-        ]);
+        const hallSeats = showtime.hall?.seats || [];
+        const requestedSeatRecords = hallSeats.filter(
+          (s: any) =>
+            seatIds.includes(s.id) ||
+            cleanRequestedLabels.includes(`${s.rowLabel}${s.seatNumber}`.toUpperCase())
+        );
 
-        if (showtime) {
-          const alreadySoldTickets = await prisma.ticket.findMany({
-            where: {
-              showtimeId,
-              seatId: { in: seatIds },
-              status: { in: ["ACTIVE", "USED"] },
+        // Check broken or aisle seats
+        const brokenOrAisle = requestedSeatRecords.filter(
+          (s: any) => s.status === "BROKEN" || s.type === "AISLE"
+        );
+        if (brokenOrAisle.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              code: "SEAT_UNAVAILABLE",
+              message: "One or more selected seats are broken or out of service.",
             },
-          });
+            { status: 409 }
+          );
+        }
 
-          if (alreadySoldTickets.length > 0) {
-            return NextResponse.json(
-              {
-                success: false,
-                message:
-                  "One or more seats have already been booked by another customer",
-              },
-              { status: 409 }
-            );
-          }
+        // Check already sold tickets in DB
+        const requestedSeatDbIds = requestedSeatRecords.map((s: any) => s.id);
+        const alreadySoldTickets = await prisma.ticket.findMany({
+          where: {
+            showtimeId: showtime.id,
+            seatId: { in: requestedSeatDbIds },
+            status: { in: ["ACTIVE", "USED"] },
+          },
+        });
+
+        if (alreadySoldTickets.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              code: "SEAT_ALREADY_BOOKED",
+              message: "One or more seats have already been booked by another customer",
+            },
+            { status: 409 }
+          );
         }
       }
     } catch (dbError) {
-      console.warn("[Lock Seats API] DB check bypassed in demo mode:", dbError);
+      console.warn("[Lock Seats API] DB check error or fallback:", dbError);
     }
 
     // 2. Atomically lock in Redis using Lua script (12 minutes TTL)

@@ -80,7 +80,8 @@ export async function GET(
       type: seat.type,
       status: seat.status,
       priceModifier: Number(seat.priceModifier || 0),
-      isBooked: bookedSeatIds.has(seat.id),
+      isBooked: bookedSeatIds.has(seat.id) || seat.status === "BROKEN",
+      isBroken: seat.status === "BROKEN",
       isLocked: lockedSeatIds.has(seat.id),
     }));
 

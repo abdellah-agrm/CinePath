@@ -282,3 +282,29 @@ model Review {
   @@map("reviews")
 }
 
+enum LogSeverity {
+  INFO
+  WARN
+  CRITICAL
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  actorId    String?     @map("actor_id")
+  actorEmail String?     @map("actor_email")
+  actorRole  String?     @map("actor_role")
+  action     String
+  severity   LogSeverity @default(INFO)
+  entityType String      @map("entity_type")
+  entityId   String?     @map("entity_id")
+  message    String
+  metadata   Json?
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([severity, createdAt])
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+

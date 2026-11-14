@@ -6,6 +6,7 @@ import { redis } from "@/lib/redis";
 import { verifyJWT, AUTH_COOKIE_NAME } from "@/lib/auth";
 import { generateTicketHmac } from "@/lib/hmac";
 import { ensureShowtimeInDb } from "@/lib/db-showtimes";
+import { logAuditEvent } from "@/lib/audit";
 
 export async function POST(request: Request) {
   try {
@@ -118,11 +119,24 @@ export async function POST(request: Request) {
       );
     }
 
+    const brokenOrAisle = matchedSeats.filter((s: any) => s.status === "BROKEN" || s.type === "AISLE");
+    if (brokenOrAisle.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "SEAT_UNAVAILABLE",
+          message: "One or more selected seats are broken or unavailable for booking.",
+        },
+        { status: 409 }
+      );
+    }
+
     // 7. Atomic ACID Transaction in PostgreSQL
     const reference = "CP-" + crypto.randomBytes(3).toString("hex").toUpperCase();
     const finalAmount = Number(totalAmount) > 0 ? Number(totalAmount) : matchedSeats.length * Number(showtime.basePrice);
 
-    let createdBooking;
+    let createdBooking: any;
+    let createdTickets: any[] = [];
     try {
       createdBooking = await prisma.$transaction(async (tx) => {
         // Check if any seat is already booked/sold
@@ -174,6 +188,7 @@ export async function POST(request: Request) {
           };
         });
 
+        createdTickets = ticketRows;
         await tx.ticket.createMany({ data: ticketRows });
 
         // Create Payment record
@@ -214,6 +229,19 @@ export async function POST(request: Request) {
       // Redis cleanup silent
     }
 
+    // 9. Persist audit log
+    await logAuditEvent({
+      actorId: authenticatedUserId,
+      actorEmail: customerEmail,
+      actorRole: authenticatedUserId ? "CUSTOMER" : "GUEST",
+      action: "BOOKING_CREATED",
+      severity: "INFO",
+      entityType: "BOOKING",
+      entityId: reference,
+      message: `Booking ${reference} confirmed for ${matchedSeats.length} seat(s) (${cleanSeatLabels.join(", ")}) on ${showtime.movie.title} (${finalAmount} MAD).`,
+      metadata: { bookingRef: reference, showtimeId: showtime.id, seats: cleanSeatLabels, totalAmount: finalAmount },
+    });
+
     // Format formatted time
     const sessionTime =
       typeof showtime.startTime === "string"
@@ -237,6 +265,11 @@ export async function POST(request: Request) {
         customerEmail,
         customerName: customerName || "Guest",
         paidAt: new Date().toISOString(),
+        tickets: createdTickets.map((t: any) => ({
+          id: t.id,
+          seatId: t.seatId,
+          qrPayload: t.qrPayload,
+        })),
       },
     });
   } catch (error: any) {

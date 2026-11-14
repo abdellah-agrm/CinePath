@@ -20,6 +20,7 @@ export default function SeatSelectionPage() {
           message="Sélection de vos places..."
           submessage="Chargement de la salle en temps réel"
           fullScreen={true}
+          theme="light"
         />
       }
     >

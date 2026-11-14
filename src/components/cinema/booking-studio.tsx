@@ -792,6 +792,7 @@ export function BookingStudio({ showtimeId }: BookingStudioProps) {
                       submessage="Vérification de la disponibilité et des réservations"
                       fullScreen={false}
                       compact={true}
+                      theme="light"
                     />
                   </div>
                 ) : backendError ? (

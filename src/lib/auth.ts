@@ -191,3 +191,58 @@ export const DEMO_USERS = [
   },
 ];
 
+/**
+ * Extracts and verifies the current authenticated user session from Next.js cookies or headers
+ */
+export async function getSessionUser(): Promise<JWTPayload | null> {
+  try {
+    const { cookies, headers } = await import("next/headers");
+    const cookieStore = await cookies();
+    const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+    if (token) {
+      const payload = await verifyJWT(token);
+      if (payload) return payload;
+    }
+
+    const headerList = await headers();
+    const sub = headerList.get("x-user-id");
+    const role = headerList.get("x-user-role") as UserRole | null;
+    const email = headerList.get("x-user-email");
+    if (sub && role && email) {
+      return {
+        sub,
+        role,
+        email,
+        fullName: email.split("@")[0],
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks for ADMIN role. Returns payload if valid, null otherwise.
+ */
+export async function requireAdminSession(): Promise<JWTPayload | null> {
+  const user = await getSessionUser();
+  if (!user || user.role !== "ADMIN") {
+    return null;
+  }
+  return user;
+}
+
+/**
+ * Checks for STAFF or ADMIN role. Returns payload if valid, null otherwise.
+ */
+export async function requireStaffSession(): Promise<JWTPayload | null> {
+  const user = await getSessionUser();
+  if (!user || (user.role !== "STAFF" && user.role !== "ADMIN")) {
+    return null;
+  }
+  return user;
+}
+
+

@@ -22,6 +22,15 @@ import {
   ChevronDown,
   ChevronUp,
   Upload,
+  Search,
+  RotateCcw,
+  ShieldCheck,
+  Ticket as TicketIcon,
+  Filter,
+  Check,
+  Loader2,
+  AlertOctagon,
+  Info,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import jsQR from "jsqr";
@@ -107,6 +116,89 @@ export default function StaffQRValidationPage() {
       setIsSecure(window.isSecureContext ?? true);
     }
   }, []);
+
+  // Staff Sub-Tabs
+  const [activeStaffTab, setActiveStaffTab] = useState<"scanner" | "tickets" | "activity">("scanner");
+
+  // Ticket Control State
+  const [ticketsList, setTicketsList] = useState<any[]>([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketSearch, setTicketSearch] = useState("");
+  const [ticketStatusFilter, setTicketStatusFilter] = useState("ALL");
+  const [actionTicketId, setActionTicketId] = useState<string | null>(null);
+
+  // Gate Turnstile Activity Logs State
+  const [gateLogs, setGateLogs] = useState<any[]>([]);
+  const [gateLogsLoading, setGateLogsLoading] = useState(false);
+
+  const fetchTickets = useCallback(async () => {
+    setTicketsLoading(true);
+    try {
+      const url = new URL("/api/staff/tickets", window.location.origin);
+      if (ticketSearch) url.searchParams.set("search", ticketSearch);
+      if (ticketStatusFilter !== "ALL") url.searchParams.set("status", ticketStatusFilter);
+      url.searchParams.set("limit", "100");
+      const res = await fetch(url.toString());
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setTicketsList(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to load staff tickets:", err);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, [ticketSearch, ticketStatusFilter]);
+
+  const handleUpdateTicketStatus = async (ticketId: string, newStatus: string, reason?: string) => {
+    setActionTicketId(ticketId);
+    try {
+      const res = await fetch("/api/staff/tickets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId, newStatus, reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTicketsList((prev) =>
+          prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
+        );
+      } else {
+        alert(data.message || "Failed to update ticket");
+      }
+    } catch (err) {
+      console.error("Error updating ticket status:", err);
+    } finally {
+      setActionTicketId(null);
+    }
+  };
+
+  const fetchGateLogs = useCallback(async () => {
+    setGateLogsLoading(true);
+    try {
+      const res = await fetch("/api/admin/logs?entityType=TICKET&limit=40");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setGateLogs(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to load gate logs:", err);
+    } finally {
+      setGateLogsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeStaffTab === "tickets") {
+      fetchTickets();
+    }
+  }, [activeStaffTab, fetchTickets]);
+
+  useEffect(() => {
+    if (activeStaffTab === "activity") {
+      fetchGateLogs();
+    }
+  }, [activeStaffTab, fetchGateLogs]);
 
   // Stop camera tracks helper
   const stopCameraStream = useCallback(() => {
@@ -416,7 +508,7 @@ export default function StaffQRValidationPage() {
 
   // Lifecycle to initialize camera when active and not showing result
   useEffect(() => {
-    if (isCameraActive && result === null) {
+    if (isCameraActive && result === null && activeStaffTab === "scanner") {
       startCameraStream();
     } else {
       stopCameraStream();
@@ -425,7 +517,7 @@ export default function StaffQRValidationPage() {
     return () => {
       stopCameraStream();
     };
-  }, [isCameraActive, result, facingMode, startCameraStream, stopCameraStream]);
+  }, [isCameraActive, result, facingMode, activeStaffTab, startCameraStream, stopCameraStream]);
 
   // Restart scanning for next ticket
   const resetScanner = () => {
@@ -435,7 +527,11 @@ export default function StaffQRValidationPage() {
   };
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-28 sm:pt-32 pb-16 min-h-screen flex flex-col justify-between text-white font-sans">
+    <div
+      className={`mx-auto px-4 pt-28 sm:pt-32 pb-16 min-h-screen flex flex-col justify-between text-white font-sans transition-all ${
+        activeStaffTab === "scanner" ? "max-w-md" : "max-w-5xl"
+      }`}
+    >
       {/* Off-screen canvas for image processing */}
       <canvas ref={canvasRef} className="hidden" />
 
@@ -470,10 +566,53 @@ export default function StaffQRValidationPage() {
           </div>
         )}
 
-        {/* =========================================================================
-            SCAN RESULT CARD (Instant visual feedback on ticket scan)
-           ========================================================================= */}
-        {result ? (
+        {/* Staff Navigation Tabs */}
+        <div className="mb-6 flex border-b border-white/10 text-xs font-semibold gap-1">
+          <button
+            onClick={() => setActiveStaffTab("scanner")}
+            className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 transition ${
+              activeStaffTab === "scanner"
+                ? "border-[#ffc61a] text-[#ffc61a] font-bold"
+                : "border-transparent text-[#9ca3af] hover:text-white"
+            }`}
+          >
+            <Scan className="h-4 w-4" />
+            <span>Turnstile Scanner</span>
+          </button>
+          <button
+            onClick={() => {
+              setActiveStaffTab("tickets");
+              fetchTickets();
+            }}
+            className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 transition ${
+              activeStaffTab === "tickets"
+                ? "border-[#ffc61a] text-[#ffc61a] font-bold"
+                : "border-transparent text-[#9ca3af] hover:text-white"
+            }`}
+          >
+            <TicketIcon className="h-4 w-4" />
+            <span>Gestion Billets</span>
+          </button>
+          <button
+            onClick={() => {
+              setActiveStaffTab("activity");
+              fetchGateLogs();
+            }}
+            className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 transition ${
+              activeStaffTab === "activity"
+                ? "border-[#ffc61a] text-[#ffc61a] font-bold"
+                : "border-transparent text-[#9ca3af] hover:text-white"
+            }`}
+          >
+            <ShieldAlert className="h-4 w-4" />
+            <span>Journal des Entrées</span>
+          </button>
+        </div>
+
+        {activeStaffTab === "scanner" && (
+          <div>
+            {/* SCAN RESULT CARD (Instant visual feedback on ticket scan) */}
+            {result ? (
           <div
             className={`rounded-3xl p-6 text-center border-2 transition shadow-2xl animate-in zoom-in-95 duration-200 ${
               result.status === "VALID"
@@ -833,6 +972,261 @@ export default function StaffQRValidationPage() {
                 </button>
               </form>
             </div>
+          </div>
+        )}
+      </div>
+    )}
+
+        {/* =========================================================================
+            TAB 2: GESTION & RECHERCHE DES BILLETS
+           ========================================================================= */}
+        {activeStaffTab === "tickets" && (
+          <div className="rounded-3xl border border-white/10 bg-[#141416] p-6 space-y-5 animate-in fade-in-50 duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <TicketIcon className="h-5 w-5 text-[#ffc61a]" />
+                  <span>Gestion & Contrôle des Billets</span>
+                </h2>
+                <p className="text-xs text-[#9ca3af] mt-0.5">
+                  Rechercher un billet par référence, email client ou film. Effectuer des entrées manuelles ou réinitialiser un billet après fausse manipulation.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#737373]" />
+                  <input
+                    type="text"
+                    placeholder="Réf CP-..., email, film..."
+                    value={ticketSearch}
+                    onChange={(e) => setTicketSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && fetchTickets()}
+                    className="rounded-xl border border-white/10 bg-black/60 pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#737373] focus:border-[#ffc61a] focus:outline-none w-52"
+                  />
+                </div>
+
+                <select
+                  value={ticketStatusFilter}
+                  onChange={(e) => setTicketStatusFilter(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-black/60 px-3 py-1.5 text-xs text-white focus:border-[#ffc61a] focus:outline-none"
+                >
+                  <option value="ALL">Tous statuts</option>
+                  <option value="ACTIVE">ACTIVE (Non scanné)</option>
+                  <option value="USED">USED (Déjà entré)</option>
+                  <option value="CANCELLED">CANCELLED (Annulé)</option>
+                </select>
+
+                <button
+                  onClick={fetchTickets}
+                  disabled={ticketsLoading}
+                  className="rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition flex items-center gap-1"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${ticketsLoading ? "animate-spin" : ""}`} />
+                  <span>Actualiser</span>
+                </button>
+              </div>
+            </div>
+
+            {ticketsLoading && ticketsList.length === 0 ? (
+              <div className="py-12 text-center">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#ffc61a]" />
+                <p className="mt-2 text-xs text-[#9ca3af]">Recherche des billets dans la base...</p>
+              </div>
+            ) : ticketsList.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#9ca3af]">
+                Aucun billet trouvé pour ces critères de recherche.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-[#9ca3af]">
+                  <thead className="border-b border-white/10 bg-black/40 uppercase text-[10px] text-white">
+                    <tr>
+                      <th className="p-3">Réf / Date</th>
+                      <th className="p-3">Film & Séance</th>
+                      <th className="p-3">Client</th>
+                      <th className="p-3">Siège</th>
+                      <th className="p-3">Statut</th>
+                      <th className="p-3 text-right">Actions Contrôleur</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {ticketsList.map((t) => (
+                      <tr key={t.id} className="hover:bg-white/5 transition">
+                        <td className="p-3">
+                          <span className="font-mono font-bold text-white">#{t.bookingRef}</span>
+                          <div className="text-[10px] text-[#737373]">
+                            {new Date(t.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        </td>
+                        <td className="p-3 font-semibold text-white">
+                          <div>{t.movieTitle}</div>
+                          <span className="text-[10px] text-[#737373]">
+                            {t.hallName} · {t.format}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="text-white font-medium">{t.customerName}</div>
+                          <div className="text-[10px] font-mono text-[#737373] truncate max-w-[130px]">
+                            {t.customerEmail}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span className="font-mono font-bold text-[#ffc61a] rounded bg-[#ffc61a]/10 px-2 py-0.5 border border-[#ffc61a]/20">
+                            {t.seatLabel}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {t.status === "ACTIVE" ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
+                              <CheckCircle className="h-3 w-3" /> VALIDE
+                            </span>
+                          ) : t.status === "USED" ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20">
+                              <Check className="h-3 w-3" /> SCANNÉ
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-400 border border-rose-500/20">
+                              <XCircle className="h-3 w-3" /> ANNULÉ
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {t.status === "ACTIVE" && (
+                              <button
+                                disabled={actionTicketId === t.id}
+                                onClick={() => handleUpdateTicketStatus(t.id, "USED", "Manual staff turnstile validation")}
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-white transition disabled:opacity-50"
+                                title="Valider manuellement l'admission"
+                              >
+                                {actionTicketId === t.id ? "..." : "Valider Entrée"}
+                              </button>
+                            )}
+
+                            {t.status === "USED" && (
+                              <button
+                                disabled={actionTicketId === t.id}
+                                onClick={() => handleUpdateTicketStatus(t.id, "ACTIVE", "Reset active after accidental gate scan")}
+                                className="rounded-lg bg-[#ffc61a]/20 hover:bg-[#ffc61a]/30 border border-[#ffc61a]/40 text-[#ffc61a] px-2.5 py-1 text-[11px] font-bold transition disabled:opacity-50 flex items-center gap-1"
+                                title="Réinitialiser en cas d'erreur de scan"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                <span>{actionTicketId === t.id ? "..." : "Réactiver"}</span>
+                              </button>
+                            )}
+
+                            {t.status !== "CANCELLED" && (
+                              <button
+                                disabled={actionTicketId === t.id}
+                                onClick={() => {
+                                  if (confirm(`Confirmez-vous l'annulation et le blocage du billet #${t.bookingRef} ?`)) {
+                                    handleUpdateTicketStatus(t.id, "CANCELLED", "Staff security block");
+                                  }
+                                }}
+                                className="rounded-lg bg-rose-950/60 hover:bg-rose-900 border border-rose-500/30 text-rose-300 px-2.5 py-1 text-[11px] font-bold transition disabled:opacity-50"
+                                title="Révoquer le billet"
+                              >
+                                Bloquer
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* =========================================================================
+            TAB 3: ACTIVITÉ DU PORTIQUE & ANOMALIES
+           ========================================================================= */}
+        {activeStaffTab === "activity" && (
+          <div className="rounded-3xl border border-white/10 bg-[#141416] p-6 space-y-5 animate-in fade-in-50 duration-200">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-[#ffc61a]" />
+                  <span>Journal des Entrées & Détection de Fraude</span>
+                </h2>
+                <p className="text-xs text-[#9ca3af] mt-0.5">
+                  Flux en direct des scans au portique, détection de réutilisation suspecte et alertes de falsification HMAC.
+                </p>
+              </div>
+
+              <button
+                onClick={fetchGateLogs}
+                disabled={gateLogsLoading}
+                className="rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition flex items-center gap-1"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${gateLogsLoading ? "animate-spin" : ""}`} />
+                <span>Actualiser</span>
+              </button>
+            </div>
+
+            {gateLogsLoading && gateLogs.length === 0 ? (
+              <div className="py-12 text-center">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#ffc61a]" />
+                <p className="mt-2 text-xs text-[#9ca3af]">Chargement du journal d&apos;activité...</p>
+              </div>
+            ) : gateLogs.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#9ca3af]">
+                Aucune activité enregistrée récemment au portique.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {gateLogs.map((log: any) => (
+                  <div
+                    key={log.id}
+                    className={`rounded-2xl border p-3.5 text-xs transition ${
+                      log.severity === "CRITICAL"
+                        ? "border-rose-500/50 bg-rose-950/30 text-rose-200"
+                        : log.severity === "WARN"
+                        ? "border-amber-500/50 bg-amber-950/30 text-amber-200"
+                        : "border-white/10 bg-black/40 text-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between font-mono text-[11px] mb-1.5 opacity-80">
+                      <div className="flex items-center gap-2">
+                        {log.severity === "CRITICAL" ? (
+                          <span className="rounded bg-rose-500/20 px-1.5 py-0.2 font-extrabold text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                            <AlertOctagon className="h-3 w-3" /> FRAUDE / CRITIQUE
+                          </span>
+                        ) : log.severity === "WARN" ? (
+                          <span className="rounded bg-amber-500/20 px-1.5 py-0.2 font-extrabold text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> ALERTE DOUBLON
+                          </span>
+                        ) : (
+                          <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 font-bold text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" /> ADMISSION OK
+                          </span>
+                        )}
+                        <span className="font-bold text-white">{log.action}</span>
+                      </div>
+                      <span>
+                        {new Date(log.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
+                      </span>
+                    </div>
+
+                    <p className="text-xs font-semibold leading-relaxed">{log.message}</p>
+
+                    {log.actorEmail && (
+                      <div className="mt-1.5 flex items-center gap-2 text-[10px] text-[#737373]">
+                        <span>Opérateur: {log.actorEmail}</span>
+                        {log.entityId && <span>· Réf: #{log.entityId}</span>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyTicketHmac } from "@/lib/hmac";
+import { logAuditEvent } from "@/lib/audit";
+import { getSessionUser } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
+    const sessionUser = await getSessionUser();
+    const actorId = sessionUser?.sub || null;
+    const actorEmail = sessionUser?.email || "turnstile@cinepath.system";
+    const actorRole = sessionUser?.role || "STAFF";
+
     const body = await request.json();
     const qrData = body.qrData || body.code;
 
@@ -18,6 +25,17 @@ export async function POST(request: Request) {
     try {
       parsedPayload = typeof qrData === "string" ? JSON.parse(qrData) : qrData;
     } catch {
+      await logAuditEvent({
+        actorId,
+        actorEmail,
+        actorRole,
+        action: "TICKET_SCAN_MALFORMED",
+        severity: "WARN",
+        entityType: "TICKET",
+        message: "Turnstile Alert: Scanned payload is malformed or unparseable",
+        metadata: { rawData: String(qrData).slice(0, 100) },
+      });
+
       return NextResponse.json(
         { success: false, code: "MALFORMED_QR", message: "Malformed QR code payload" },
         { status: 400 }
@@ -30,6 +48,18 @@ export async function POST(request: Request) {
     if (ticketId && showtimeId && hmac) {
       const isValidHmac = verifyTicketHmac(ticketId, showtimeId, bookingRef, hmac);
       if (!isValidHmac) {
+        await logAuditEvent({
+          actorId,
+          actorEmail,
+          actorRole,
+          action: "TICKET_SCAN_TAMPERED",
+          severity: "CRITICAL",
+          entityType: "TICKET",
+          entityId: ticketId || bookingRef || "UNKNOWN",
+          message: `Security Anomaly: Forged or tampered HMAC signature on QR scan! Ref: ${bookingRef || "N/A"}`,
+          metadata: { bookingRef, ticketId, showtimeId },
+        });
+
         return NextResponse.json(
           {
             success: false,
@@ -60,6 +90,18 @@ export async function POST(request: Request) {
     });
 
     if (!booking) {
+      await logAuditEvent({
+        actorId,
+        actorEmail,
+        actorRole,
+        action: "TICKET_SCAN_NOT_FOUND",
+        severity: "WARN",
+        entityType: "TICKET",
+        entityId: bookingRef || "UNKNOWN",
+        message: `Turnstile Alert: Ticket not found in cinema records. Scanned ref: ${bookingRef}`,
+        metadata: { bookingRef },
+      });
+
       return NextResponse.json(
         {
           success: false,
@@ -72,6 +114,18 @@ export async function POST(request: Request) {
 
     // 3. Check status
     if (booking.status === "CANCELLED" || booking.status === "REFUNDED") {
+      await logAuditEvent({
+        actorId,
+        actorEmail,
+        actorRole,
+        action: "TICKET_SCAN_CANCELLED",
+        severity: "WARN",
+        entityType: "TICKET",
+        entityId: booking.reference,
+        message: `Turnstile Alert: Attempted entry with ${booking.status} ticket ${booking.reference}`,
+        metadata: { bookingRef: booking.reference, status: booking.status },
+      });
+
       return NextResponse.json(
         {
           success: false,
@@ -86,6 +140,18 @@ export async function POST(request: Request) {
     const usedTickets = booking.tickets.filter((t) => t.status === "USED");
 
     if (activeTickets.length === 0 && usedTickets.length > 0) {
+      await logAuditEvent({
+        actorId,
+        actorEmail,
+        actorRole,
+        action: "TICKET_SCAN_DUPLICATE",
+        severity: "WARN",
+        entityType: "TICKET",
+        entityId: booking.reference,
+        message: `Turnstile Alert: Duplicate scan for ticket ${booking.reference}. Already admitted at ${usedTickets[0]?.usedAt?.toLocaleTimeString() || "Earlier"}.`,
+        metadata: { bookingRef: booking.reference, usedAt: usedTickets[0]?.usedAt },
+      });
+
       return NextResponse.json(
         {
           success: false,
@@ -108,6 +174,25 @@ export async function POST(request: Request) {
       data: { status: "USED" },
     });
 
+    // 5. Log valid scan in audit trail
+    const seatLabels = booking.tickets.map((t) => `${t.seat.rowLabel}${t.seat.seatNumber}`);
+    await logAuditEvent({
+      actorId,
+      actorEmail,
+      actorRole,
+      action: "TICKET_SCAN_VALID",
+      severity: "INFO",
+      entityType: "TICKET",
+      entityId: booking.reference,
+      message: `Turnstile: Admission granted for ticket ${booking.reference} (${booking.showtime.movie.title}, ${booking.showtime.hall.name}, Seats: ${seatLabels.join(", ")})`,
+      metadata: {
+        bookingRef: booking.reference,
+        movieTitle: booking.showtime.movie.title,
+        hall: booking.showtime.hall.name,
+        seats: seatLabels,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       code: "VALID",
@@ -120,9 +205,7 @@ export async function POST(request: Request) {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        seats: booking.tickets.map(
-          (t) => `${t.seat.rowLabel}${t.seat.seatNumber}`
-        ),
+        seats: seatLabels,
         format: booking.showtime.format,
         status: "USED",
         validatedAt: new Date().toLocaleTimeString(),
