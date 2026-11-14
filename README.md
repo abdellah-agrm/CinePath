@@ -7,7 +7,8 @@
 </p>
 
 <p align="center">
-  <strong>Enterprise-Grade Cinema Multiplex Operations, Distributed Atomic Ticketing & Turnstile Access Engine</strong>
+  <strong>Enterprise-Grade Cinema Multiplex Operations, Distributed Atomic Ticketing & Turnstile Access Engine</strong><br/>
+  <sub>Architected & Developed by <a href="https://github.com/abdellah-agrm"><strong>Abdellah Agourram</strong></a></sub>
 </p>
 
 <p align="center">
@@ -661,7 +662,7 @@ When deploying CinePath to production environments (Vercel, AWS ECS, Railway, or
 
 ---
 
-## 📄 License & Credits
+## 📄 Author & License
 
-Developed with ❤️ by the **CinePath Team**.  
+Architected & developed with ❤️ by [**Abdellah Agourram**](https://github.com/abdellah-agrm).  
 Licensed under the [MIT License](LICENSE).

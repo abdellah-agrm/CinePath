@@ -1,7 +1,7 @@
 {
   "name": "cinepath",
   "version": "1.0.0",
-  "author": "CinePath Team",
+  "author": "Abdellah Agourram <https://github.com/abdellah-agrm>",
   "license": "MIT",
   "private": true,
   "scripts": {

@@ -1660,6 +1660,24 @@ export default function AdminDashboardPage() {
           )}
         </div>
       )}
+
+      {/* Admin Footer Attribution */}
+      <footer className="mt-16 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between text-xs text-muted-foreground gap-4">
+        <div>
+          CinePath Operations Portal &middot; Conçu et développé par{" "}
+          <a
+            href="https://github.com/abdellah-agrm"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline font-semibold"
+          >
+            Abdellah Agourram
+          </a>
+        </div>
+        <div>
+          v1.0.0 &middot; Next.js 15 &middot; PostgreSQL &middot; Redis
+        </div>
+      </footer>
     </div>
   );
 }

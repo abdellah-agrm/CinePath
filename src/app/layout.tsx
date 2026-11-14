@@ -25,6 +25,8 @@ export const metadata: Metadata = {
   title: "Les Cinémas Pathé Maroc · Films, Séances & Réservation en ligne",
   description:
     "Consultez les films à l'affiche, les horaires des séances en IMAX, 4DX et Dolby Atmos, et réservez vos places en temps réel dans vos cinémas Pathé Maroc.",
+  authors: [{ name: "Abdellah Agourram", url: "https://github.com/abdellah-agrm" }],
+  creator: "Abdellah Agourram",
   icons: {
     icon: "/logo/CinePath_Bear_Black_Icon.png",
     shortcut: "/logo/CinePath_Bear_Black_Icon.png",

@@ -1232,8 +1232,19 @@ export default function StaffQRValidationPage() {
       </div>
 
       {/* Footer System Status */}
-      <div className="text-center text-[11px] text-[#737373] pt-6">
-        <span>Système de contrôle d&apos;accès Pathé Maroc · Station #1</span>
+      <div className="text-center text-[11px] text-[#737373] pt-6 flex flex-col items-center gap-1">
+        <span>Système de contrôle d&apos;accès CinePath · Station #1</span>
+        <span>
+          Conçu et développé par{" "}
+          <a
+            href="https://github.com/abdellah-agrm"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#ffc61a] hover:underline font-semibold"
+          >
+            Abdellah Agourram
+          </a>
+        </span>
       </div>
 
       {/* Embedded CSS animation for scanner sweep */}
