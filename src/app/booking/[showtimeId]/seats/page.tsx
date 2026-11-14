@@ -2,8 +2,8 @@
 
 import { Suspense } from "react";
 import { useParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { BookingStudio } from "@/components/cinema/booking-studio";
+import { CinemaLoader } from "@/components/cinema/cinema-loader";
 
 function BookingContent() {
   const params = useParams();
@@ -16,9 +16,11 @@ export default function SeatSelectionPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#09090b] text-neutral-400">
-          <Loader2 className="h-8 w-8 animate-spin text-[#feca00]" />
-        </div>
+        <CinemaLoader
+          message="Sélection de vos places..."
+          submessage="Chargement de la salle en temps réel"
+          fullScreen={true}
+        />
       }
     >
       <BookingContent />

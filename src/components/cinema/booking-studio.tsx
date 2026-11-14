@@ -15,6 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+import { CinemaLoader } from "@/components/cinema/cinema-loader";
 
 interface SeatItem {
   id: string;
@@ -785,9 +786,13 @@ export function BookingStudio({ showtimeId }: BookingStudioProps) {
               {/* White Rounded Seat Map Container */}
               <div className="relative w-full max-w-[1040px] rounded-2xl border border-zinc-200/80 bg-white px-4 sm:px-12 py-8 flex flex-col items-center shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
                 {isLoadingBackend ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-neutral-400 gap-3">
-                    <Loader2 className="h-8 w-8 animate-spin text-[#ffc61a]" />
-                    <span className="text-xs font-semibold">Chargement des sièges en temps réel...</span>
+                  <div className="w-full py-8">
+                    <CinemaLoader
+                      message="Chargement des sièges en temps réel..."
+                      submessage="Vérification de la disponibilité et des réservations"
+                      fullScreen={false}
+                      compact={true}
+                    />
                   </div>
                 ) : backendError ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto gap-3">

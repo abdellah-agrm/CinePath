@@ -81,6 +81,50 @@ h1, h2, h3 {
   animation: subtle-shimmer 3s infinite linear;
 }
 
+/* CinePath Cinema Loader Animations */
+@keyframes cinema-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.94;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes cinema-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(180%);
+  }
+}
+
+@keyframes cinema-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.06);
+  }
+}
+
+.animate-cinema-pulse {
+  animation: cinema-pulse 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-cinema-shimmer {
+  animation: cinema-shimmer 1.8s ease-in-out infinite;
+}
+
+.animate-cinema-glow {
+  animation: cinema-glow 2.8s ease-in-out infinite;
+}
+
 /* Perforated Ticket Notches */
 .ticket-perforation-left {
   position: absolute;

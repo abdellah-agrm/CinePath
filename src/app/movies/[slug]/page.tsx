@@ -17,6 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { CinemaFAQ } from "@/components/cinema-faq";
+import { CinemaLoader } from "@/components/cinema/cinema-loader";
 
 interface MovieDetail {
   title: string;
@@ -62,6 +63,7 @@ export default function MovieDetailPage() {
 
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0); // Default to today
   const [isLiked, setIsLiked] = useState(false);
   const [isFavoriteCinema, setIsFavoriteCinema] = useState(false);
@@ -109,22 +111,33 @@ export default function MovieDetailPage() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     const controller = new AbortController();
 
     async function fetchMovieDetails() {
       try {
         setLoading(true);
+        setError(null);
         const res = await fetch(`/api/movies/${slug}`, { signal: controller.signal });
         const json = await res.json();
+
+        if (!isMounted) return;
+
         if (json.success && json.data) {
           setMovie(json.data);
+          setError(null);
+        } else {
+          setError(json.message || "Film introuvable");
         }
       } catch (err: any) {
-        if (err.name !== "AbortError") {
+        if (err.name !== "AbortError" && isMounted) {
           console.error("Failed to fetch movie details:", err);
+          setError("Impossible de charger les détails du film");
         }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
@@ -133,6 +146,7 @@ export default function MovieDetailPage() {
     }
 
     return () => {
+      isMounted = false;
       controller.abort();
     };
   }, [slug]);
@@ -173,23 +187,30 @@ export default function MovieDetailPage() {
     ];
   }, [slug]);
 
-  if (loading) {
+  if (loading || (!movie && !error)) {
     return (
-      <div className="flex min-h-[75vh] flex-col items-center justify-center gap-3 text-neutral-400 bg-[#0a0a0a]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#ffc61a]" />
-        <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-          Chargement de la séance...
-        </p>
-      </div>
+      <CinemaLoader
+        message="Chargement de votre film..."
+        submessage="Préparation de la séance et des formats IMAX & 4DX"
+        fullScreen={true}
+      />
     );
   }
 
-  if (!movie) {
+  if (error || !movie) {
     return (
-      <div className="py-24 text-center bg-[#0a0a0a] text-white">
-        <Film className="mx-auto h-12 w-12 text-neutral-600 mb-3" />
-        <h2 className="text-xl font-bold">Film introuvable</h2>
-        <Link href="/movies" className="mt-4 inline-block text-xs font-bold text-[#ffc61a] underline">
+      <div className="py-32 px-4 text-center bg-[#0a0a0a] text-white flex flex-col items-center justify-center min-h-[75vh]">
+        <div className="h-16 w-16 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center mb-4">
+          <Film className="h-8 w-8 text-neutral-500" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Film introuvable</h2>
+        <p className="text-xs sm:text-sm text-neutral-400 mt-1.5 max-w-sm">
+          {error || "Le film demandé n'est pas disponible actuellement ou sa programmation a été mise à jour."}
+        </p>
+        <Link
+          href="/movies"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#ffc61a] hover:bg-[#ffd147] text-[#0a0a0a] px-5 py-2.5 text-xs font-bold transition-transform active:scale-95"
+        >
           Retour au catalogue des films
         </Link>
       </div>
