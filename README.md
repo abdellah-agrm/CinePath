@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="public/logo/CinePath_Bear_White_Full_Logo.png" alt="CinePath Logo" width="460" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/logo/CinePath_Bear_Full_Logo_II.png">
+    <source media="(prefers-color-scheme: light)" srcset="public/logo/CinePath_Bear_Full_Logo.png">
+    <img alt="CinePath Logo" src="public/logo/CinePath_Bear_Full_Logo.png" width="460">
+  </picture>
 </p>
 
 <p align="center">
@@ -478,6 +482,7 @@ cinepath/
 ├── logo/                          # Vector & PNG branding assets
 │   ├── CinePath_Bear_Black_Icon.png
 │   ├── CinePath_Bear_Full_Logo.png
+│   ├── CinePath_Bear_Full_Logo_II.png
 │   ├── CinePath_Bear_White_Full_Logo.png
 │   └── CinePath_Bear_White_Icon.png
 ├── prisma/
